@@ -7,10 +7,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500&display=swap" rel="stylesheet">
 </head>
 <body class="login-page">
-    <!-- Фон -->
     <div class="background-overlay" style="background: linear-gradient(135deg, #0a0f1e, #1a1f30);"></div>
     
-    <!-- Шапка с навигацией -->
     <header class="site-header">
         <a href="/views/index.html" class="home-link">🏠 Главная</a>
         <a href="/views/login.html" class="btn-login">Вход</a>
@@ -34,20 +32,25 @@
     <script>
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
+            
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
+            const errorEl = document.getElementById('loginError');
             
             try {
                 const response = await fetch('/api/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
+                    body: JSON.stringify({ username, password }),
+                    credentials: 'include'
                 });
                 
                 const data = await response.json();
                 
-                if (data.success) {
-                    NotificationManager.show('Вход выполнен успешно!', 'success');
+                if (response.ok && data.success) {
+                    if (window.NotificationManager) {
+                        window.NotificationManager.show('Вход выполнен успешно!', 'success');
+                    }
                     
                     window.dispatchEvent(new Event('authChange'));
                     
@@ -55,10 +58,11 @@
                         window.location.href = '/views/admin-panel.html';
                     }, 1000);
                 } else {
-                    document.getElementById('loginError').textContent = data.error || 'Ошибка входа';
+                    errorEl.textContent = data.error || 'Ошибка входа';
                 }
             } catch (error) {
-                document.getElementById('loginError').textContent = 'Ошибка соединения';
+                console.error('Ошибка:', error);
+                errorEl.textContent = 'Ошибка соединения с сервером';
             }
         });
     </script>

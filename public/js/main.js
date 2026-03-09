@@ -1,21 +1,28 @@
 // Проверка авторизации и обновление UI
 async function updateAuthUI() {
   const loginBtn = document.querySelector('.btn-login');
-  const homeLink = document.querySelector('.home-link');
   
   if (!loginBtn) return;
   
   try {
-    const response = await fetch('/api/me');
+    const response = await fetch('/api/me', {
+      credentials: 'include'
+    });
+    
+    if (response.status === 401) {
+      loginBtn.textContent = 'Вход';
+      loginBtn.href = '/views/login.html';
+      loginBtn.classList.remove('logged-in');
+      return;
+    }
+    
     const data = await response.json();
     
     if (data.user) {
-      // Пользователь авторизован
       loginBtn.textContent = '👤 Аккаунт';
       loginBtn.href = '/views/admin-panel.html';
       loginBtn.classList.add('logged-in');
     } else {
-      // Пользователь не авторизован
       loginBtn.textContent = 'Вход';
       loginBtn.href = '/views/login.html';
       loginBtn.classList.remove('logged-in');
@@ -33,7 +40,6 @@ function updateNavigation() {
   const header = document.querySelector('.site-header');
   if (!header) return;
   
-  // Добавляем ссылку на главную, если её нет
   if (!document.querySelector('.home-link')) {
     const homeLink = document.createElement('a');
     homeLink.href = '/views/index.html';
@@ -139,7 +145,6 @@ class FileUploader {
     `;
     
     uploadArea.appendChild(fileInput);
-    
     uploadArea.addEventListener('click', () => fileInput.click());
     
     fileInput.addEventListener('change', (e) => {
@@ -223,7 +228,7 @@ function formatDate(dateString) {
   });
 }
 
-// Создание модального окна (исправленная версия)
+// Создание модального окна
 function createModal(options = {}) {
   const {
     title = '',
@@ -232,7 +237,6 @@ function createModal(options = {}) {
     width = '600px'
   } = options;
   
-  // Закрываем все существующие модальные окна
   const existingModals = document.querySelectorAll('.modal-overlay');
   existingModals.forEach(modal => modal.remove());
   
@@ -262,12 +266,10 @@ function createModal(options = {}) {
   
   closeBtn.addEventListener('click', closeModal);
   
-  // Закрытие только при клике на overlay (фон), а не на само модальное окно
   overlay.addEventListener('click', (e) => {
     if (e.target === overlay) closeModal();
   });
   
-  // Предотвращаем закрытие при клике внутри модального окна
   modal.addEventListener('click', (e) => {
     e.stopPropagation();
   });
@@ -287,6 +289,7 @@ async function fetchAPI(url, options = {}) {
         'Content-Type': 'application/json',
         ...options.headers
       },
+      credentials: 'include',
       ...options
     });
     
@@ -305,16 +308,10 @@ async function fetchAPI(url, options = {}) {
 
 // Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', () => {
-  // Добавляем навигацию
   updateNavigation();
-  
-  // Обновляем UI в зависимости от авторизации
   updateAuthUI();
-  
-  // Слушаем изменения авторизации
   window.addEventListener('authChange', updateAuthUI);
   
-  // Эффект параллакса для фона
   const overlay = document.querySelector('.background-overlay');
   if (overlay) {
     window.addEventListener('mousemove', (e) => {
@@ -324,7 +321,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
   
-  // Проверка авторизации для защиты страниц
   const protectedPages = ['admin-panel.html'];
   const currentPage = window.location.pathname.split('/').pop();
   
@@ -335,7 +331,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-// Экспортируем глобальные функции
 window.NotificationManager = NotificationManager;
 window.FileUploader = FileUploader;
 window.formatDate = formatDate;
