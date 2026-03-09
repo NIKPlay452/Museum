@@ -34,8 +34,15 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // Обслуживаем статические файлы из корня
-app.use(express.static(__dirname));
-
+app.use(express.static(__dirname, {
+    setHeaders: (res, path) => {
+        if (path.endsWith('.css')) {
+            res.setHeader('Content-Type', 'text/css');
+        } else if (path.endsWith('.js')) {
+            res.setHeader('Content-Type', 'application/javascript');
+        }
+    }
+}));
 // Корневой маршрут
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
@@ -432,6 +439,15 @@ app.get('/api/test', (req, res) => {
     res.json({ message: 'Сервер работает', time: new Date().toISOString() });
 });
 
+// Отладка - показать все файлы в корне
+app.get('/debug-files', (req, res) => {
+    const files = fs.readdirSync(__dirname);
+    res.json({ 
+        message: 'Файлы в корне проекта:',
+        files: files.filter(f => !f.startsWith('.') && !f.includes('node_modules'))
+    });
+});
+
 app.listen(PORT, () => {
     console.log(`✅ Сервер запущен на http://localhost:${PORT}`);
     console.log(`🌐 Главная страница: http://localhost:${PORT}/`);
@@ -449,3 +465,5 @@ app.listen(PORT, () => {
 });
 
 module.exports = app;
+
+
