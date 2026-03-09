@@ -62,36 +62,69 @@
             }
         });
     </script> -->
-    <script>
-    console.log('Скрипт входа загружен');
+<script>
+    console.log('✅ Скрипт входа загружен');
     
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        console.log('Форма отправлена');
+        console.log('📝 Форма отправлена');
         
         const username = document.getElementById('username').value;
         const password = document.getElementById('password').value;
         
+        console.log('👤 Логин:', username);
+        console.log('🔑 Пароль:', password ? '✓ введен' : '✗ пустой');
+        
         try {
+            console.log('🔄 Отправка запроса к /api/login...');
+            
             const response = await fetch('/api/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password })
             });
             
-            console.log('Статус ответа:', response.status);
-            const data = await response.json();
-            console.log('Данные ответа:', data);
+            console.log('📊 Статус ответа:', response.status);
+            console.log('📊 Тип ответа:', response.headers.get('content-type'));
             
-            if (data.success) {
-                alert('Успешный вход!');
-                window.location.href = '/views/admin-panel.html';
+            // Проверяем, что ответ в формате JSON
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                const text = await response.text();
+                console.error('❌ Ответ не в формате JSON:', text);
+                document.getElementById('loginError').textContent = 'Ошибка сервера: неверный формат ответа';
+                return;
+            }
+            
+            const data = await response.json();
+            console.log('📦 Данные ответа:', data);
+            
+            if (response.ok && data.success) {
+                console.log('✅ Вход выполнен успешно!');
+                
+                // Показываем уведомление через NotificationManager
+                if (window.NotificationManager) {
+                    window.NotificationManager.show('Вход выполнен успешно!', 'success');
+                } else {
+                    alert('Вход выполнен успешно!');
+                }
+                
+                // Обновляем UI на всех страницах
+                window.dispatchEvent(new Event('authChange'));
+                
+                // Перенаправляем в админ-панель
+                console.log('➡️ Перенаправление в админ-панель...');
+                setTimeout(() => {
+                    window.location.href = '/views/admin-panel.html';
+                }, 1000);
             } else {
+                console.log('❌ Ошибка входа:', data.error || 'Неизвестная ошибка');
                 document.getElementById('loginError').textContent = data.error || 'Ошибка входа';
             }
         } catch (error) {
-            console.error('Ошибка:', error);
-            document.getElementById('loginError').textContent = 'Ошибка соединения';
+            console.error('🔥 Критическая ошибка:', error);
+            console.error('Стек ошибки:', error.stack);
+            document.getElementById('loginError').textContent = 'Ошибка соединения: ' + error.message;
         }
     });
 </script>

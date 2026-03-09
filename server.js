@@ -62,26 +62,49 @@ const isAdmin = (req, res, next) => {
 
 // Маршруты для авторизации
 app.post('/api/login', (req, res) => {
+    console.log('🔐 Попытка входа:', req.body.username);
+    
     const { username, password } = req.body;
+    
+    if (!username || !password) {
+        console.log('❌ Не указан логин или пароль');
+        return res.status(400).json({ error: 'Логин и пароль обязательны' });
+    }
+    
     db.get(`SELECT * FROM users WHERE username = ?`, [username], (err, user) => {
         if (err) {
+            console.error('❌ Ошибка базы данных:', err);
             return res.status(500).json({ error: 'Ошибка сервера' });
         }
+        
         if (!user) {
+            console.log('❌ Пользователь не найден:', username);
             return res.status(401).json({ error: 'Неверный логин или пароль' });
         }
         
+        console.log('✅ Пользователь найден:', user.username, 'Роль:', user.role);
+        
         // Проверка пароля
         bcrypt.compare(password, user.password, (err, isValid) => {
-            if (err || !isValid) {
+            if (err) {
+                console.error('❌ Ошибка сравнения паролей:', err);
+                return res.status(500).json({ error: 'Ошибка сервера' });
+            }
+            
+            if (!isValid) {
+                console.log('❌ Неверный пароль для пользователя:', username);
                 return res.status(401).json({ error: 'Неверный логин или пароль' });
             }
+            
+            console.log('✅ Пароль верный, создаем сессию');
             
             req.session.user = {
                 id: user.id,
                 username: user.username,
                 role: user.role
             };
+            
+            console.log('✅ Сессия создана:', req.session.user);
             
             res.json({ 
                 success: true, 
@@ -516,5 +539,16 @@ app.listen(PORT, () => {
         console.log('⚠️ Ошибка при загрузке Telegram бота:', error.message);
     }
 });
+// Настройка сессий для Vercel
+app.use(session({
+    secret: 'your-secret-key-museum',
+    resave: false,
+    saveUninitialized: false,
+    cookie: { 
+        secure: false, // Для localhost
+        maxAge: 24 * 60 * 60 * 1000 // 24 часа
+    },
+    proxy: true // Важно для Vercel
+}));
 
 module.exports = app;
