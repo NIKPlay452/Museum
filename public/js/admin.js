@@ -1,6 +1,4 @@
-// public/js/admin.js
 // Основная логика для панели администратора и редактора
-
 let currentUser = null;
 let exhibits = [];
 
