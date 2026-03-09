@@ -5,8 +5,7 @@ const db = require('./database');
 const token = '8612678836:AAHoTSlgUPldFzsWqkpfWp0YlWytk2gp9Qk';
 
 // ID администратора для уведомлений
-const ADMIN_CHAT_ID = 123456789; // ВАШ РЕАЛЬНЫЙ ID
-
+const ADMIN_CHAT_ID = 5231666805;
 let bot = null;
 
 // Хранилище состояний пользователей (вынесено наружу, чтобы сохранялось между вызовами)
