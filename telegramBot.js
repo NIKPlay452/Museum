@@ -401,44 +401,39 @@ function initBot() {
 
 // Функция для отправки учетных данных пользователю
 async function sendCredentialsToUser(chatId, username, password) {
-    if (!bot) {
-        console.log('❌ Бот не запущен, не могу отправить сообщение');
-        return false;
-    }
-    
-    try {
-        await bot.sendMessage(
-            chatId, 
-            `✅ **ВАША ЗАЯВКА ОДОБРЕНА!**\n\n` +
-            `Вы теперь редактор Музея компьютерных технологий.\n\n` +
-            `🔑 **Данные для входа:**\n` +
-            `Логин: \`${username}\`\n` +
-            `Пароль: \`${password}\`\n\n` +
-            `🌐 **Ссылка для входа:**\n` +
-            `http://localhost:3000/views/login.html\n\n` +
-            `⚠️ Рекомендуем сменить пароль после первого входа.`,
-            {
-                parse_mode: 'Markdown',
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: '🌐 Перейти на сайт', url: 'http://localhost:3000/views/login.html' }]
-                    ]
-                }
-            }
-        );
-        
-        console.log(`✅ Учётные данные отправлены пользователю ${chatId}`);
-        return true;
-        
-    } catch (error) {
-        console.error('❌ Ошибка отправки сообщения:', error.message);
-        
-        if (error.message.includes('chat not found')) {
-            console.log('⚠️ Пользователь еще не писал боту. Он должен сначала отправить /start');
+  if (!bot) {
+    console.log('❌ Бот не запущен, не могу отправить сообщение');
+    return false;
+  }
+  
+  try {
+    await bot.sendMessage(
+      chatId, 
+      `✅ **ВАША ЗАЯВКА ОДОБРЕНА!**\n\n` +
+      `Вы теперь редактор Музея компьютерных технологий.\n\n` +
+      `🔑 **Данные для входа:**\n` +
+      `Логин: \`${username}\`\n` +
+      `Пароль: \`${password}\`\n\n` + // Здесь обычный пароль
+      `🌐 **Ссылка для входа:**\n` +
+      `https://museum-tech.vercel.app/views/login.html\n\n` +
+      `⚠️ Рекомендуем сменить пароль после первого входа.`,
+      {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '🌐 Перейти на сайт', url: 'https://museum-tech.vercel.app/views/login.html' }]
+          ]
         }
-        
-        return false;
-    }
+      }
+    );
+    
+    console.log(`✅ Учётные данные отправлены пользователю ${chatId}`);
+    return true;
+    
+  } catch (error) {
+    console.error('❌ Ошибка отправки сообщения:', error.message);
+    return false;
+  }
 }
 
 // Функция для проверки статуса бота

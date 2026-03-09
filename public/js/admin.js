@@ -1,4 +1,6 @@
+// public/js/admin.js
 // Основная логика для панели администратора и редактора
+
 let currentUser = null;
 let exhibits = [];
 
@@ -71,7 +73,7 @@ async function loadExhibits() {
   }
 }
 
-// Создание экспоната (ОБНОВЛЕННАЯ ВЕРСИЯ)
+// Создание экспоната
 function openCreateModal() {
   const modalContent = `
     <div class="create-exhibit-form">
@@ -191,7 +193,7 @@ function openCreateModal() {
   });
 }
 
-// Редактирование экспоната (ОБНОВЛЕННАЯ ВЕРСИЯ)
+// Редактирование экспоната
 async function openEditModal() {
   let modalContent = '';
   
@@ -292,7 +294,7 @@ async function openEditModal() {
   }
 }
 
-// Загрузка экспоната для редактирования (ОБНОВЛЕННАЯ ВЕРСИЯ)
+// Загрузка экспоната для редактирования
 async function loadExhibitForEdit(exhibitId, containerId) {
   try {
     const response = await fetch(`/api/exhibits/${exhibitId}`);
@@ -693,7 +695,7 @@ async function loadEditorsList() {
   }
 }
 
-// Создание редактора
+// Создание редактора (обновленная версия)
 function openCreateEditorModal() {
   const modalContent = `
     <div class="create-exhibit-form" style="grid-template-columns: 1fr;">
@@ -704,7 +706,8 @@ function openCreateEditorModal() {
       
       <div class="form-group">
         <label>Пароль *</label>
-        <input type="password" id="editor-password" required placeholder="••••••••">
+        <input type="text" id="editor-password" required placeholder="Введите пароль" value="${generatePassword()}">
+        <small style="color: #94a3b8;">Этот пароль будет отправлен пользователю в Telegram</small>
       </div>
       
       <div class="form-group">
@@ -743,7 +746,12 @@ function openCreateEditorModal() {
       const response = await fetch('/api/admin/editors', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password, email, telegramId })
+        body: JSON.stringify({ 
+          username, 
+          password, // Отправляем обычный пароль
+          email, 
+          telegramId 
+        })
       });
       
       const data = await response.json();
@@ -839,7 +847,7 @@ async function openApplicationsModal() {
   }
 }
 
-// Открыть модальное окно создания редактора из заявки (с подтверждением)
+// Открыть модальное окно создания редактора из заявки (обновленная версия)
 window.openCreateEditorFromApplicationModal = async (id) => {
   // Сначала показываем подтверждение
   const confirmContent = `
@@ -860,7 +868,6 @@ window.openCreateEditorFromApplicationModal = async (id) => {
     width: '400px'
   });
   
-  // Обработчик для кнопки "Да, одобрить"
   document.getElementById('confirm-approve-yes').addEventListener('click', async () => {
     confirmModal.close();
     
@@ -868,7 +875,8 @@ window.openCreateEditorFromApplicationModal = async (id) => {
       const response = await fetch(`/api/admin/applications/${id}`);
       const application = await response.json();
       
-      const password = generatePassword();
+      // Генерируем обычный пароль (НЕ ХЕШ)
+      const plainPassword = generatePassword();
       
       const modalContent = `
         <div class="create-exhibit-form" style="grid-template-columns: 1fr;">
@@ -879,8 +887,8 @@ window.openCreateEditorFromApplicationModal = async (id) => {
           
           <div class="form-group">
             <label>Пароль *</label>
-            <input type="text" id="editor-password" value="${password}" style="background: #1a1f30; font-family: monospace;">
-            <small style="color: #94a3b8;">Вы можете изменить пароль</small>
+            <input type="text" id="editor-password" value="${plainPassword}" style="background: #1a1f30; font-family: monospace;">
+            <small style="color: #94a3b8;">Этот пароль будет отправлен пользователю в Telegram</small>
           </div>
           
           <div class="form-group">
@@ -906,12 +914,13 @@ window.openCreateEditorFromApplicationModal = async (id) => {
       document.getElementById('save-editor-btn').addEventListener('click', async () => {
         const finalPassword = document.getElementById('editor-password').value;
         
+        // Отправляем обычный пароль на сервер
         const createResponse = await fetch('/api/admin/editors', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             username: application.username,
-            password: finalPassword,
+            password: finalPassword, // Здесь обычный пароль
             email: application.email,
             telegramId: application.telegram_chat_id
           })
@@ -920,6 +929,7 @@ window.openCreateEditorFromApplicationModal = async (id) => {
         const createData = await createResponse.json();
         
         if (createResponse.ok) {
+          // Одобряем заявку
           await fetch(`/api/admin/applications/${id}/approve`, { method: 'POST' });
           
           NotificationManager.show(
@@ -940,7 +950,6 @@ window.openCreateEditorFromApplicationModal = async (id) => {
     }
   });
   
-  // Обработчик для кнопки "Нет, отмена"
   document.getElementById('confirm-approve-no').addEventListener('click', () => {
     confirmModal.close();
   });
