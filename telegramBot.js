@@ -1,17 +1,11 @@
 const TelegramBot = require('node-telegram-bot-api');
 const db = require('./database');
 
-// Токен вашего бота
 const token = '8612678836:AAHoTSlgUPldFzsWqkpfWp0YlWytk2gp9Qk';
-
-// ID администратора для уведомлений
 const ADMIN_CHAT_ID = 5231666805;
 let bot = null;
-
-// Хранилище состояний пользователей (вынесено наружу, чтобы сохранялось между вызовами)
 const userStates = {};
 
-// Функция для запуска бота
 function initBot() {
     try {
         console.log('🤖 Запуск Telegram бота...');
@@ -27,7 +21,6 @@ function initBot() {
         
         console.log('✅ Telegram бот успешно запущен!');
         
-        // Обработчик ошибок бота
         bot.on('polling_error', (error) => {
             console.error('❌ Ошибка polling бота:', error.message);
         });
@@ -36,14 +29,12 @@ function initBot() {
             console.error('❌ Ошибка бота:', error.message);
         });
         
-        // Обработка команды /start
         bot.onText(/\/start/, (msg) => {
             const chatId = msg.chat.id;
             const userName = msg.from.first_name || 'Пользователь';
             
             console.log(`📩 Пользователь ${userName} (${chatId}) запустил бота`);
             
-            // Сбрасываем предыдущее состояние
             userStates[chatId] = { step: 'name' };
             
             bot.sendMessage(
@@ -65,12 +56,10 @@ function initBot() {
             );
         });
         
-        // Обработка команды /status
         bot.onText(/\/status/, async (msg) => {
             const chatId = msg.chat.id;
             
             try {
-                // Ищем заявку пользователя по telegram_chat_id
                 db.get(
                     `SELECT * FROM applications WHERE telegram_chat_id = ? ORDER BY created_at DESC LIMIT 1`,
                     [chatId],
@@ -125,7 +114,6 @@ function initBot() {
                         message += `📧 Email: ${application.email || 'Не указан'}\n\n`;
                         
                         if (application.status === 'approved') {
-                            // Если заявка одобрена, ищем учетные данные редактора
                             db.get(
                                 `SELECT * FROM users WHERE username = ?`,
                                 [application.username],
@@ -137,7 +125,7 @@ function initBot() {
                                         message += `🔑 **Данные для входа:**\n`;
                                         message += `Логин: \`${user.username}\`\n`;
                                         message += `Пароль: \`${user.password}\` (временно, смените при входе)\n\n`;
-                                        message += `🌐 Вход: http://localhost:3000/views/login.html`;
+                                        message += `🌐 Вход: https://museum-six-umber.vercel.app/login.html`;
                                     }
                                     bot.sendMessage(chatId, message, { 
                                         parse_mode: 'Markdown',
@@ -172,7 +160,6 @@ function initBot() {
             }
         });
         
-        // Обработка команды /cancel
         bot.onText(/\/cancel/, (msg) => {
             const chatId = msg.chat.id;
             
@@ -191,20 +178,16 @@ function initBot() {
             );
         });
         
-        // Обработка текстовых сообщений (не команд)
         bot.on('message', async (msg) => {
             const chatId = msg.chat.id;
             const text = msg.text;
             
-            // Игнорируем команды (начинаются с /)
             if (!text || text.startsWith('/')) {
                 return;
             }
             
-            // Получаем состояние пользователя
             const state = userStates[chatId];
             
-            // Если пользователь не начинал регистрацию
             if (!state) {
                 bot.sendMessage(
                     chatId,
@@ -220,7 +203,6 @@ function initBot() {
                 return;
             }
             
-            // Обработка отмены
             if (text === '❌ Отменить регистрацию') {
                 delete userStates[chatId];
                 bot.sendMessage(
@@ -235,11 +217,9 @@ function initBot() {
                 return;
             }
             
-            // Пошаговая регистрация
             try {
                 switch (state.step) {
                     case 'name':
-                        // Проверяем, что введено не пустое значение
                         if (!text || text.length < 5) {
                             bot.sendMessage(
                                 chatId,
@@ -257,7 +237,6 @@ function initBot() {
                         break;
                         
                     case 'username':
-                        // Проверяем логин на допустимые символы
                         if (!/^[a-zA-Z0-9_]{3,20}$/.test(text)) {
                             bot.sendMessage(
                                 chatId,
@@ -266,7 +245,6 @@ function initBot() {
                             return;
                         }
                         
-                        // Проверяем логин на уникальность
                         const existingUser = await new Promise((resolve) => {
                             db.get('SELECT username FROM users WHERE username = ?', [text], (err, row) => {
                                 resolve(row);
@@ -289,7 +267,6 @@ function initBot() {
                         break;
                         
                     case 'email':
-                        // Простая проверка email
                         if (!text.includes('@') || !text.includes('.') || text.length < 5) {
                             bot.sendMessage(
                                 chatId,
@@ -306,7 +283,6 @@ function initBot() {
                         break;
                         
                     case 'reason':
-                        // Проверяем, что причина не пустая
                         if (!text || text.length < 10) {
                             bot.sendMessage(
                                 chatId,
@@ -320,7 +296,6 @@ function initBot() {
                         
                         console.log(`📝 Новая заявка от ${username} (${fullName})`);
                         
-                        // Сохраняем в базу данных
                         db.run(
                             `INSERT INTO applications (full_name, username, email, reason, telegram_chat_id, status) 
                              VALUES (?, ?, ?, ?, ?, 'pending')`,
@@ -349,7 +324,6 @@ function initBot() {
                                         }
                                     );
                                     
-                                    // Уведомление администратору
                                     if (ADMIN_CHAT_ID) {
                                         bot.sendMessage(
                                             ADMIN_CHAT_ID,
@@ -363,7 +337,6 @@ function initBot() {
                                         ).catch(e => console.log('Не удалось отправить уведомление админу'));
                                     }
                                     
-                                    // Очищаем состояние
                                     delete userStates[chatId];
                                 }
                             }
@@ -398,44 +371,42 @@ function initBot() {
     }
 }
 
-// Функция для отправки учетных данных пользователю
 async function sendCredentialsToUser(chatId, username, password) {
-  if (!bot) {
-    console.log('❌ Бот не запущен, не могу отправить сообщение');
-    return false;
-  }
-  
-  try {
-    await bot.sendMessage(
-      chatId, 
-      `✅ **ВАША ЗАЯВКА ОДОБРЕНА!**\n\n` +
-      `Вы теперь редактор Музея компьютерных технологий.\n\n` +
-      `🔑 **Данные для входа:**\n` +
-      `Логин: \`${username}\`\n` +
-      `Пароль: \`${password}\`\n\n` + // Здесь обычный пароль
-      `🌐 **Ссылка для входа:**\n` +
-      `https://museum-tech.vercel.app/views/login.html\n\n` +
-      `⚠️ Рекомендуем сменить пароль после первого входа.`,
-      {
-        parse_mode: 'Markdown',
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: '🌐 Перейти на сайт', url: 'https://museum-tech.vercel.app/views/login.html' }]
-          ]
-        }
-      }
-    );
+    if (!bot) {
+        console.log('❌ Бот не запущен, не могу отправить сообщение');
+        return false;
+    }
     
-    console.log(`✅ Учётные данные отправлены пользователю ${chatId}`);
-    return true;
-    
-  } catch (error) {
-    console.error('❌ Ошибка отправки сообщения:', error.message);
-    return false;
-  }
+    try {
+        await bot.sendMessage(
+            chatId, 
+            `✅ **ВАША ЗАЯВКА ОДОБРЕНА!**\n\n` +
+            `Вы теперь редактор Музея компьютерных технологий.\n\n` +
+            `🔑 **Данные для входа:**\n` +
+            `Логин: \`${username}\`\n` +
+            `Пароль: \`${password}\`\n\n` +
+            `🌐 **Ссылка для входа:**\n` +
+            `https://museum-six-umber.vercel.app/login.html\n\n` +
+            `⚠️ Рекомендуем сменить пароль после первого входа.`,
+            {
+                parse_mode: 'Markdown',
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '🌐 Перейти на сайт', url: 'https://museum-six-umber.vercel.app/login.html' }]
+                    ]
+                }
+            }
+        );
+        
+        console.log(`✅ Учётные данные отправлены пользователю ${chatId}`);
+        return true;
+        
+    } catch (error) {
+        console.error('❌ Ошибка отправки сообщения:', error.message);
+        return false;
+    }
 }
 
-// Функция для проверки статуса бота
 function getBotStatus() {
     return {
         isRunning: bot !== null,
@@ -444,7 +415,6 @@ function getBotStatus() {
     };
 }
 
-// Запускаем бота
 console.log('🔄 Инициализация Telegram бота...');
 initBot();
 

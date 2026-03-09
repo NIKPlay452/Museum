@@ -9,13 +9,11 @@ const db = require('./database');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Секретный ключ для JWT (в продакшене должен быть в переменных окружения)
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-museum';
 
-// Настройка multer для загрузки файлов
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        let uploadPath = 'public/uploads/';
+        let uploadPath = 'uploads/';
         if (file.fieldname === 'media') {
             uploadPath += 'exhibits/';
         } else if (file.fieldname === 'background') {
@@ -31,21 +29,18 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// Статические файлы
-app.use(express.static('public'));
-app.use('/views', express.static('views'));
+// Обслуживаем статические файлы из корня
+app.use(express.static(__dirname));
 
 // Корневой маршрут
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'views', 'index.html'));
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Middleware для проверки JWT токена
 const authenticateToken = (req, res, next) => {
     const token = req.cookies.token || req.headers['authorization']?.split(' ')[1];
     
@@ -62,7 +57,6 @@ const authenticateToken = (req, res, next) => {
     });
 };
 
-// Middleware для проверки роли админа
 const isAdmin = (req, res, next) => {
     if (req.user && req.user.role === 'admin') {
         next();
@@ -71,7 +65,6 @@ const isAdmin = (req, res, next) => {
     }
 };
 
-// Маршруты для авторизации
 app.post('/api/login', (req, res) => {
     console.log('🔐 Попытка входа:', req.body.username);
     
@@ -96,7 +89,6 @@ app.post('/api/login', (req, res) => {
                 return res.status(401).json({ error: 'Неверный логин или пароль' });
             }
             
-            // Создаем JWT токен
             const token = jwt.sign(
                 { 
                     id: user.id, 
@@ -107,7 +99,6 @@ app.post('/api/login', (req, res) => {
                 { expiresIn: '24h' }
             );
             
-            // Устанавливаем cookie с токеном
             res.cookie('token', token, {
                 httpOnly: true,
                 secure: process.env.NODE_ENV === 'production',
@@ -135,7 +126,6 @@ app.get('/api/me', authenticateToken, (req, res) => {
     res.json({ user: req.user });
 });
 
-// Маршруты для экспонатов
 app.get('/api/exhibits', (req, res) => {
     db.all(`SELECT * FROM exhibits WHERE status = 'approved' ORDER BY year ASC`, [], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -254,11 +244,11 @@ app.delete('/api/admin/exhibits/:id', authenticateToken, isAdmin, (req, res) => 
         if (!exhibit) return res.status(404).json({ error: 'Экспонат не найден' });
         
         if (exhibit.media_path) {
-            const mediaPath = path.join(__dirname, 'public', exhibit.media_path);
+            const mediaPath = path.join(__dirname, exhibit.media_path);
             if (fs.existsSync(mediaPath)) fs.unlinkSync(mediaPath);
         }
         if (exhibit.background_path) {
-            const bgPath = path.join(__dirname, 'public', exhibit.background_path);
+            const bgPath = path.join(__dirname, exhibit.background_path);
             if (fs.existsSync(bgPath)) fs.unlinkSync(bgPath);
         }
         
@@ -286,7 +276,6 @@ app.post('/api/exhibits/check-duplicate', authenticateToken, (req, res) => {
     });
 });
 
-// Маршруты для админа
 app.get('/api/admin/pending-creations', authenticateToken, isAdmin, (req, res) => {
     db.all(`SELECT e.*, u.username as creator_name FROM exhibits e 
             LEFT JOIN users u ON e.created_by = u.id 
@@ -344,7 +333,6 @@ app.post('/api/admin/reject/:id', authenticateToken, isAdmin, (req, res) => {
     });
 });
 
-// Маршруты для редакторов
 app.get('/api/admin/editors', authenticateToken, isAdmin, (req, res) => {
     db.all(`SELECT id, username, created_at FROM users WHERE role = 'editor'`, [], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -406,7 +394,6 @@ app.post('/api/admin/editors', authenticateToken, isAdmin, async (req, res) => {
     );
 });
 
-// Маршруты для заявок
 app.get('/api/admin/applications', authenticateToken, isAdmin, (req, res) => {
     db.all(`SELECT * FROM applications ORDER BY created_at DESC`, [], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -441,15 +428,13 @@ app.post('/api/admin/applications/:id/reject', authenticateToken, isAdmin, (req,
     });
 });
 
-// Тестовый маршрут
 app.get('/api/test', (req, res) => {
     res.json({ message: 'Сервер работает', time: new Date().toISOString() });
 });
 
-// Запуск сервера
 app.listen(PORT, () => {
     console.log(`✅ Сервер запущен на http://localhost:${PORT}`);
-    console.log(`🌐 Главная страница: http://localhost:${PORT}/views/index.html`);
+    console.log(`🌐 Главная страница: http://localhost:${PORT}/`);
     console.log(`🔑 Тестовый админ: admin / admin123`);
     
     try {
