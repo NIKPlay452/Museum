@@ -1,21 +1,36 @@
 {
   "name": "museum-tech",
   "version": "1.0.0",
-  "description": "Музей компьютерных технологий с временной шкалой",
+  "description": "Музей компьютерных технологий с временной шкалой и Telegram ботом",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "vercel-build": "echo 'Build completed'",
+    "build": "echo 'No build required'"
   },
+  "keywords": [
+    "museum",
+    "timeline",
+    "telegram-bot",
+    "express",
+    "sqlite"
+  ],
+  "author": "",
+  "license": "ISC",
   "dependencies": {
-    "bcryptjs": "^2.4.3",
     "express": "^4.18.2",
     "express-session": "^1.17.3",
+    "sqlite3": "^5.1.6",
     "multer": "^1.4.5-lts.1",
-    "node-telegram-bot-api": "^0.64.0",
-    "sqlite3": "^5.1.6"
+    "bcryptjs": "^2.4.3",
+    "node-telegram-bot-api": "^0.64.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
   }
 }

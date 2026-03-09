@@ -39,6 +39,9 @@ app.use(session({
 }));
 app.use(express.static('public'));
 app.use('/views', express.static('views'));
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'views', 'index.html'));
+});
 
 // Middleware для проверки авторизации
 const isAuthenticated = (req, res, next) => {
