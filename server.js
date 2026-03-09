@@ -9,8 +9,10 @@ const db = require('./database');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Секретный ключ для JWT (в продакшене должен быть в переменных окружения)
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-museum';
 
+// Настройка multer для загрузки файлов
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
         let uploadPath = 'uploads/';
@@ -19,6 +21,7 @@ const storage = multer.diskStorage({
         } else if (file.fieldname === 'background') {
             uploadPath += 'backgrounds/';
         }
+        // Создаем папку, если её нет
         fs.mkdirSync(uploadPath, { recursive: true });
         cb(null, uploadPath);
     },
@@ -29,25 +32,20 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
+// Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// Обслуживаем статические файлы из корня
-app.use(express.static(__dirname, {
-    setHeaders: (res, path) => {
-        if (path.endsWith('.css')) {
-            res.setHeader('Content-Type', 'text/css');
-        } else if (path.endsWith('.js')) {
-            res.setHeader('Content-Type', 'application/javascript');
-        }
-    }
-}));
-// Корневой маршрут
+// Обслуживаем статические файлы из корня (ВАЖНО для варианта А)
+app.use(express.static(__dirname));
+
+// Корневой маршрут - отдаем index.html из корня
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
+// Middleware для проверки JWT токена
 const authenticateToken = (req, res, next) => {
     const token = req.cookies.token || req.headers['authorization']?.split(' ')[1];
     
@@ -64,6 +62,7 @@ const authenticateToken = (req, res, next) => {
     });
 };
 
+// Middleware для проверки роли админа
 const isAdmin = (req, res, next) => {
     if (req.user && req.user.role === 'admin') {
         next();
@@ -72,6 +71,7 @@ const isAdmin = (req, res, next) => {
     }
 };
 
+// ============= МАРШРУТЫ ДЛЯ АВТОРИЗАЦИИ =============
 app.post('/api/login', (req, res) => {
     console.log('🔐 Попытка входа:', req.body.username);
     
@@ -96,6 +96,7 @@ app.post('/api/login', (req, res) => {
                 return res.status(401).json({ error: 'Неверный логин или пароль' });
             }
             
+            // Создаем JWT токен
             const token = jwt.sign(
                 { 
                     id: user.id, 
@@ -106,6 +107,7 @@ app.post('/api/login', (req, res) => {
                 { expiresIn: '24h' }
             );
             
+            // Устанавливаем cookie с токеном
             res.cookie('token', token, {
                 httpOnly: true,
                 secure: process.env.NODE_ENV === 'production',
@@ -133,6 +135,7 @@ app.get('/api/me', authenticateToken, (req, res) => {
     res.json({ user: req.user });
 });
 
+// ============= МАРШРУТЫ ДЛЯ ЭКСПОНАТОВ =============
 app.get('/api/exhibits', (req, res) => {
     db.all(`SELECT * FROM exhibits WHERE status = 'approved' ORDER BY year ASC`, [], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -283,6 +286,7 @@ app.post('/api/exhibits/check-duplicate', authenticateToken, (req, res) => {
     });
 });
 
+// ============= МАРШРУТЫ ДЛЯ АДМИНА (ПРОВЕРКА ЭКСПОНАТОВ) =============
 app.get('/api/admin/pending-creations', authenticateToken, isAdmin, (req, res) => {
     db.all(`SELECT e.*, u.username as creator_name FROM exhibits e 
             LEFT JOIN users u ON e.created_by = u.id 
@@ -340,6 +344,7 @@ app.post('/api/admin/reject/:id', authenticateToken, isAdmin, (req, res) => {
     });
 });
 
+// ============= МАРШРУТЫ ДЛЯ РАБОТЫ С РЕДАКТОРАМИ =============
 app.get('/api/admin/editors', authenticateToken, isAdmin, (req, res) => {
     db.all(`SELECT id, username, created_at FROM users WHERE role = 'editor'`, [], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -401,6 +406,7 @@ app.post('/api/admin/editors', authenticateToken, isAdmin, async (req, res) => {
     );
 });
 
+// ============= МАРШРУТЫ ДЛЯ ПРОСМОТРА ЗАЯВОК =============
 app.get('/api/admin/applications', authenticateToken, isAdmin, (req, res) => {
     db.all(`SELECT * FROM applications ORDER BY created_at DESC`, [], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -435,29 +441,25 @@ app.post('/api/admin/applications/:id/reject', authenticateToken, isAdmin, (req,
     });
 });
 
+// ============= ТЕСТОВЫЙ МАРШРУТ =============
 app.get('/api/test', (req, res) => {
     res.json({ message: 'Сервер работает', time: new Date().toISOString() });
 });
 
-// Отладка - показать все файлы в корне
-app.get('/debug-files', (req, res) => {
-    const files = fs.readdirSync(__dirname);
-    res.json({ 
-        message: 'Файлы в корне проекта:',
-        files: files.filter(f => !f.startsWith('.') && !f.includes('node_modules'))
-    });
-});
-
+// ============= ЗАПУСК СЕРВЕРА =============
 app.listen(PORT, () => {
     console.log(`✅ Сервер запущен на http://localhost:${PORT}`);
     console.log(`🌐 Главная страница: http://localhost:${PORT}/`);
     console.log(`🔑 Тестовый админ: admin / admin123`);
     
+    // Запуск Telegram бота
     try {
         const botPath = path.join(__dirname, 'telegramBot.js');
         if (fs.existsSync(botPath)) {
             require('./telegramBot');
             console.log('✅ Telegram бот загружен');
+        } else {
+            console.log('⚠️ Файл telegramBot.js не найден');
         }
     } catch (error) {
         console.log('⚠️ Ошибка при загрузке Telegram бота:', error.message);
@@ -465,5 +467,3 @@ app.listen(PORT, () => {
 });
 
 module.exports = app;
-
-
