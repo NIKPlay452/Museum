@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Панель управления - Музей технологий</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500&display=swap" rel="stylesheet">
+</head>
+<body class="admin-page">
+    <!-- Фон -->
+    <div class="background-overlay" style="background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4MCIgaGVpZ2h0PSI4MCIgdmlld0JveD0iMCAwIDQwIDQwIj48cGF0aCBkPSJNMjAgMTBhMTAgMTAgMCAwIDEgMCAyMCAxMCAxMCAwIDAgMSAwLTIweiIgZmlsbD0iIzBmMCIgb3BhY2l0eT0iMC4xIi8+PC9zdmc+'); opacity: 0.1;"></div>
+    
+    <!-- Единая шапка для всех страниц -->
+    <header class="site-header">
+        <a href="/views/index.html" class="home-link">🏠 Главная</a>
+        <div class="header-right">
+            <span class="user-badge" id="userRole"></span>
+            <a href="/views/login.html" class="btn-login" id="loginBtn">Вход</a>
+            <button id="logoutBtn" class="btn-logout" style="display: none;">Выход</button>
+        </div>
+    </header>
+    
+    <!-- Панель управления (уже без шапки, только контент) -->
+    <div class="admin-container">
+        <h1 class="admin-title">Панель управления музеем</h1>
+        
+        <div class="admin-buttons">
+            <button class="admin-btn" data-action="create">
+                <span class="btn-icon">➕</span> Создать экспонат
+            </button>
+            <button class="admin-btn" data-action="edit">
+                <span class="btn-icon">✏️</span> Редактировать
+            </button>
+            <button class="admin-btn" data-action="status">
+                <span class="btn-icon">📊</span> Состояние экспонатов
+            </button>
+            <button class="admin-btn admin-only" data-action="editors" style="display: none;">
+                <span class="btn-icon">👥</span> Работа с редакторами
+            </button>
+            <button class="admin-btn admin-only" data-action="applications" style="display: none;">
+                <span class="btn-icon">📨</span> Заявки на редакторов
+            </button>
+        </div>
+    </div>
+    
+    <!-- Контейнер для модальных окон -->
+    <div id="modalContainer"></div>
+    
+    <script src="/js/main.js"></script>
+    <script src="/js/admin.js"></script>
+</body>
+</html>

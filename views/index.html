@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Музей компьютерных технологий</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+</head>
+<body id="main-body">
+    <!-- Фон -->
+    <div class="background-overlay"></div>
+    
+    <!-- Шапка с навигацией -->
+    <header class="site-header">
+        <a href="/views/index.html" class="home-link">🏠 Главная</a>
+        <a href="/views/login.html" class="btn-login">Вход</a>
+    </header>
+    
+    <!-- Фиксированная кнопка Telegram (исправленная иконка) -->
+    <a href="https://t.me/MuseumTechBot" target="_blank" class="telegram-fab">
+        <svg viewBox="0 0 24 24" width="35" height="35" fill="white">
+            <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.248c-.183 1.914-.973 6.558-1.376 8.702-.17.906-.506 1.21-.83 1.24-.706.064-1.242-.467-1.926-.915-1.07-.7-1.675-1.136-2.714-1.819-1.202-.79-.423-1.224.262-1.934.179-.186 3.288-3.014 3.348-3.27.008-.034.015-.16-.06-.226-.074-.067-.184-.044-.264-.026-.112.026-1.897 1.205-5.36 3.543-.507.348-.967.518-1.379.509-.454-.01-1.327-.257-1.977-.468-.796-.258-1.43-.395-1.375-.834.03-.229.344-.463.946-.702 3.69-1.608 6.152-2.668 7.386-3.18 3.517-1.46 4.248-1.714 4.726-1.722.105-.002.34.024.492.146.128.103.163.242.18.34.017.098.038.32.021.494z"/>
+        </svg>
+    </a>
+    
+    <div class="container">
+        <h1 class="site-title">⚡ ХРОНОЛОГИЯ КОМПЬЮТЕРНОЙ ЭРЫ ⚡</h1>
+        
+        <!-- Временная шкала -->
+        <div class="timeline-container">
+            <div class="timeline-line"></div>
+            <div class="timeline-points" id="timeline-points"></div>
+        </div>
+        
+        <!-- Детали экспоната -->
+        <div class="exhibit-details" id="exhibit-details" style="display: none;">
+            <button class="close-details">&times;</button>
+            <div class="exhibit-content">
+                <div class="exhibit-media" id="exhibit-media"></div>
+                <div class="exhibit-info">
+                    <h2 id="exhibit-title"></h2>
+                    <p class="exhibit-year" id="exhibit-year"></p>
+                    <p class="exhibit-description" id="exhibit-description"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/js/main.js"></script>
+    <script src="/js/timeline.js"></script>
+</body>
+</html>
