@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <title>Панель управления - Музей технологий</title>
-    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="/css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500&display=swap" rel="stylesheet">
 </head>
 <body class="admin-page">
     <div class="background-overlay" style="background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4MCIgaGVpZ2h0PSI4MCIgdmlld0JveD0iMCAwIDQwIDQwIj48cGF0aCBkPSJNMjAgMTBhMTAgMTAgMCAwIDEgMCAyMCAxMCAxMCAwIDAgMSAwLTIweiIgZmlsbD0iIzBmMCIgb3BhY2l0eT0iMC4xIi8+PC9zdmc+'); opacity: 0.1;"></div>
     
     <header class="site-header">
-        <a href="/index.html" class="home-link">🏠 Главная</a>
+        <a href="/views/index.html" class="home-link">🏠 Главная</a>
         <div class="header-right">
             <span class="user-badge" id="userRole"></span>
-            <a href="/login.html" class="btn-login" id="loginBtn">Вход</a>
+            <a href="/views/login.html" class="btn-login" id="loginBtn">Вход</a>
             <button id="logoutBtn" class="btn-logout" style="display: none;">Выход</button>
         </div>
     </header>
@@ -42,7 +42,7 @@
     
     <div id="modalContainer"></div>
     
-    <script src="/main.js"></script>
-    <script src="/admin.js"></script>
+<script src="/js/main.js"></script>
+<script src="/js/admin.js"></script>
 </body>
 </html>

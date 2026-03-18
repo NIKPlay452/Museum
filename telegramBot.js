@@ -100,9 +100,6 @@ function initBot() {
                                 statusEmoji = '❌';
                                 statusText = 'отклонена';
                                 break;
-                            default:
-                                statusEmoji = '❓';
-                                statusText = 'неизвестен';
                         }
                         
                         const date = new Date(application.created_at).toLocaleString('ru-RU');
@@ -125,7 +122,7 @@ function initBot() {
                                         message += `🔑 **Данные для входа:**\n`;
                                         message += `Логин: \`${user.username}\`\n`;
                                         message += `Пароль: \`${user.password}\` (временно, смените при входе)\n\n`;
-                                        message += `🌐 Вход: https://museum-six-umber.vercel.app/login.html`;
+                                        message += `🌐 Вход: http://localhost:3000/views/login.html`;
                                     }
                                     bot.sendMessage(chatId, message, { 
                                         parse_mode: 'Markdown',
@@ -182,9 +179,7 @@ function initBot() {
             const chatId = msg.chat.id;
             const text = msg.text;
             
-            if (!text || text.startsWith('/')) {
-                return;
-            }
+            if (!text || text.startsWith('/')) return;
             
             const state = userStates[chatId];
             
@@ -221,73 +216,44 @@ function initBot() {
                 switch (state.step) {
                     case 'name':
                         if (!text || text.length < 5) {
-                            bot.sendMessage(
-                                chatId,
-                                '❌ Пожалуйста, введите корректное ФИО (минимум 5 символов):'
-                            );
+                            bot.sendMessage(chatId, '❌ Пожалуйста, введите корректное ФИО (минимум 5 символов):');
                             return;
                         }
-                        
                         userStates[chatId] = { ...state, step: 'username', fullName: text };
-                        bot.sendMessage(
-                            chatId,
-                            '✅ ФИО сохранено!\n\n📝 Введите желаемый логин (username):\n' +
-                            '(Только латинские буквы и цифры)'
-                        );
+                        bot.sendMessage(chatId, '✅ ФИО сохранено!\n\n📝 Введите желаемый логин (username):\n(Только латинские буквы и цифры)');
                         break;
                         
                     case 'username':
                         if (!/^[a-zA-Z0-9_]{3,20}$/.test(text)) {
-                            bot.sendMessage(
-                                chatId,
-                                '❌ Логин должен содержать только латинские буквы, цифры и подчеркивания (от 3 до 20 символов):'
-                            );
+                            bot.sendMessage(chatId, '❌ Логин должен содержать только латинские буквы, цифры и подчеркивания (от 3 до 20 символов):');
                             return;
                         }
                         
                         const existingUser = await new Promise((resolve) => {
-                            db.get('SELECT username FROM users WHERE username = ?', [text], (err, row) => {
-                                resolve(row);
-                            });
+                            db.get('SELECT username FROM users WHERE username = ?', [text], (err, row) => resolve(row));
                         });
                         
                         if (existingUser) {
-                            bot.sendMessage(
-                                chatId,
-                                '❌ Этот логин уже занят. Пожалуйста, введите другой логин:'
-                            );
+                            bot.sendMessage(chatId, '❌ Этот логин уже занят. Пожалуйста, введите другой логин:');
                             return;
                         }
                         
                         userStates[chatId] = { ...state, step: 'email', username: text };
-                        bot.sendMessage(
-                            chatId,
-                            '✅ Логин сохранен!\n\n📝 Введите ваш email:'
-                        );
+                        bot.sendMessage(chatId, '✅ Логин сохранен!\n\n📝 Введите ваш email:');
                         break;
                         
                     case 'email':
                         if (!text.includes('@') || !text.includes('.') || text.length < 5) {
-                            bot.sendMessage(
-                                chatId,
-                                '❌ Пожалуйста, введите корректный email (например: name@domain.com):'
-                            );
+                            bot.sendMessage(chatId, '❌ Пожалуйста, введите корректный email (например: name@domain.com):');
                             return;
                         }
-                        
                         userStates[chatId] = { ...state, step: 'reason', email: text };
-                        bot.sendMessage(
-                            chatId,
-                            '✅ Email сохранен!\n\n📝 Почему вы хотите стать редактором? (кратко, 1-2 предложения)'
-                        );
+                        bot.sendMessage(chatId, '✅ Email сохранен!\n\n📝 Почему вы хотите стать редактором? (кратко, 1-2 предложения)');
                         break;
                         
                     case 'reason':
                         if (!text || text.length < 10) {
-                            bot.sendMessage(
-                                chatId,
-                                '❌ Пожалуйста, напишите причину подробнее (минимум 10 символов):'
-                            );
+                            bot.sendMessage(chatId, '❌ Пожалуйста, напишите причину подробнее (минимум 10 символов):');
                             return;
                         }
                         
@@ -303,10 +269,7 @@ function initBot() {
                             function(err) {
                                 if (err) {
                                     console.error('❌ Ошибка сохранения заявки:', err);
-                                    bot.sendMessage(
-                                        chatId,
-                                        '❌ Произошла ошибка при сохранении заявки. Пожалуйста, попробуйте позже.'
-                                    );
+                                    bot.sendMessage(chatId, '❌ Произошла ошибка при сохранении заявки. Пожалуйста, попробуйте позже.');
                                 } else {
                                     console.log(`✅ Заявка #${this.lastID} сохранена в базе`);
                                     
@@ -342,25 +305,10 @@ function initBot() {
                             }
                         );
                         break;
-                        
-                    default:
-                        delete userStates[chatId];
-                        bot.sendMessage(
-                            chatId,
-                            '❌ Что-то пошло не так. Отправьте /start для начала регистрации.',
-                            {
-                                reply_markup: {
-                                    remove_keyboard: true
-                                }
-                            }
-                        );
                 }
             } catch (error) {
                 console.error('❌ Ошибка в обработчике сообщений:', error);
-                bot.sendMessage(
-                    chatId,
-                    '❌ Произошла ошибка. Пожалуйста, попробуйте позже или отправьте /start заново.'
-                );
+                bot.sendMessage(chatId, '❌ Произошла ошибка. Пожалуйста, попробуйте позже или отправьте /start заново.');
             }
         });
         
@@ -386,13 +334,13 @@ async function sendCredentialsToUser(chatId, username, password) {
             `Логин: \`${username}\`\n` +
             `Пароль: \`${password}\`\n\n` +
             `🌐 **Ссылка для входа:**\n` +
-            `https://museum-six-umber.vercel.app/login.html\n\n` +
+            `http://localhost:3000/views/login.html\n\n` +
             `⚠️ Рекомендуем сменить пароль после первого входа.`,
             {
                 parse_mode: 'Markdown',
                 reply_markup: {
                     inline_keyboard: [
-                        [{ text: '🌐 Перейти на сайт', url: 'https://museum-six-umber.vercel.app/login.html' }]
+                        [{ text: '🌐 Перейти на сайт', url: 'http://localhost:3000/views/login.html' }]
                     ]
                 }
             }

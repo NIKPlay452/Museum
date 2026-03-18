@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <title>Вход - Музей технологий</title>
-    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="/css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500&display=swap" rel="stylesheet">
 </head>
 <body class="login-page">
     <div class="background-overlay" style="background: linear-gradient(135deg, #0a0f1e, #1a1f30);"></div>
     
     <header class="site-header">
-        <a href="/index.html" class="home-link">🏠 Главная</a>
-        <a href="/login.html" class="btn-login">Вход</a>
+        <a href="/views/index.html" class="home-link">🏠 Главная</a>
+        <a href="/views/login.html" class="btn-login">Вход</a>
     </header>
     
     <div class="login-container">
@@ -28,7 +28,7 @@
         </form>
     </div>
     
-    <script src="/main.js"></script>
+    <script src="/js/main.js"></script>
     <script>
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -55,7 +55,7 @@
                     window.dispatchEvent(new Event('authChange'));
                     
                     setTimeout(() => {
-                        window.location.href = '/admin-panel.html';
+                        window.location.href = '/views/admin-panel.html';
                     }, 1000);
                 } else {
                     errorEl.textContent = data.error || 'Ошибка входа';

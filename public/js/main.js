@@ -321,7 +321,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
   
-  const protectedPages = ['admin-panel.html'];
+  const protectedPages = ['/views/admin-panel.html'];
   const currentPage = window.location.pathname.split('/').pop();
   
   if (protectedPages.includes(currentPage)) {

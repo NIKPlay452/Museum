@@ -3,7 +3,6 @@ const path = require('path');
 
 const dbPath = path.resolve(__dirname, 'museum.db');
 
-// Открываем соединение с БД
 const db = new sqlite3.Database(dbPath, (err) => {
     if (err) {
         console.error('Ошибка подключения к БД:', err.message);
@@ -13,10 +12,8 @@ const db = new sqlite3.Database(dbPath, (err) => {
     }
 });
 
-// Инициализация таблиц
 function initTables() {
     db.serialize(() => {
-        // Таблица пользователей (админы и редакторы)
         db.run(`CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
@@ -26,23 +23,21 @@ function initTables() {
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )`);
 
-        // Таблица экспонатов
         db.run(`CREATE TABLE IF NOT EXISTS exhibits (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,
             year INTEGER NOT NULL,
             description TEXT NOT NULL,
-            media_path TEXT, -- путь к файлу (картинка/видео/3D)
-            background_path TEXT, -- путь к файлу фона
+            media_path TEXT,
+            background_path TEXT,
             status TEXT CHECK(status IN ('pending_creation', 'pending_edit', 'approved', 'rejected')) DEFAULT 'pending_creation',
             created_by INTEGER,
-            original_id INTEGER, -- для отслеживания редактируемых экспонатов (если это правка)
+            original_id INTEGER,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (created_by) REFERENCES users(id),
             FOREIGN KEY (original_id) REFERENCES exhibits(id)
         )`);
 
-        // Таблица заявок из Telegram
         db.run(`CREATE TABLE IF NOT EXISTS applications (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             full_name TEXT,
@@ -56,12 +51,10 @@ function initTables() {
 
         console.log('Таблицы созданы/проверены.');
         
-        // Создаем тестового админа, если нет ни одного пользователя
         createDefaultAdmin();
     });
 }
 
-// Функция для создания админа по умолчанию
 function createDefaultAdmin() {
     db.get(`SELECT * FROM users WHERE role = 'admin'`, (err, row) => {
         if (err) {
