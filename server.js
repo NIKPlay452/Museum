@@ -15,7 +15,6 @@ const PORT = process.env.PORT || 3000;
 // ============================================================================
 
 const JWT_SECRET = process.env.JWT_SECRET || 'museum-secret-key-2026';
-const CACHE_DURATION = 5 * 60 * 1000; // 5 минут
 
 // ImageKit
 const imagekit = new ImageKit({
@@ -107,13 +106,23 @@ const isAdmin = (req, res, next) => {
 
 app.post('/api/login', (req, res) => {
     const { username, password } = req.body;
+    console.log(`🔐 Попытка входа: ${username}`);
     
     db.get(`SELECT * FROM users WHERE username = ?`, [username], (err, user) => {
-        if (err) return res.status(500).json({ error: 'Ошибка сервера' });
-        if (!user) return res.status(401).json({ error: 'Неверный логин или пароль' });
+        if (err) {
+            console.error('❌ Ошибка БД:', err);
+            return res.status(500).json({ error: 'Ошибка сервера' });
+        }
+        if (!user) {
+            console.log('❌ Пользователь не найден');
+            return res.status(401).json({ error: 'Неверный логин или пароль' });
+        }
         
         bcrypt.compare(password, user.password, (err, isValid) => {
-            if (err || !isValid) return res.status(401).json({ error: 'Неверный логин или пароль' });
+            if (err || !isValid) {
+                console.log('❌ Неверный пароль');
+                return res.status(401).json({ error: 'Неверный логин или пароль' });
+            }
             
             const token = jwt.sign(
                 { id: user.id, username: user.username, role: user.role },
@@ -143,29 +152,40 @@ app.get('/api/me', authenticateToken, (req, res) => {
 });
 
 // ============================================================================
-// ЭКСПОНАТЫ
+// ЭКСПОНАТЫ (ИСПРАВЛЕННАЯ ВЕРСИЯ)
 // ============================================================================
 
 app.get('/api/exhibits', (req, res) => {
     db.all(`SELECT * FROM exhibits WHERE status = 'approved' ORDER BY year ASC`, [], (err, rows) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json(rows);
+        if (err) {
+            console.error('❌ Ошибка загрузки экспонатов:', err);
+            return res.status(500).json({ error: 'Ошибка базы данных' });
+        }
+        res.json(rows || []);
     });
 });
 
 app.get('/api/exhibits/all', authenticateToken, (req, res) => {
+    console.log('📋 Запрос всех экспонатов от:', req.user?.username);
+    
     db.all(`SELECT e.*, u.username as creator_name FROM exhibits e 
             LEFT JOIN users u ON e.created_by = u.id 
             ORDER BY e.year ASC`, [], (err, rows) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json(rows);
+        if (err) {
+            console.error('❌ Ошибка загрузки всех экспонатов:', err);
+            return res.status(500).json({ error: err.message });
+        }
+        res.json(rows || []);
     });
 });
 
 app.get('/api/exhibits/:id', (req, res) => {
     const id = req.params.id;
     db.get(`SELECT * FROM exhibits WHERE id = ?`, [id], (err, row) => {
-        if (err) return res.status(500).json({ error: err.message });
+        if (err) {
+            console.error('❌ Ошибка загрузки экспоната:', err);
+            return res.status(500).json({ error: err.message });
+        }
         if (!row) return res.status(404).json({ error: 'Экспонат не найден' });
         res.json(row);
     });
@@ -183,8 +203,11 @@ app.get('/api/exhibits/status/:status', authenticateToken, (req, res) => {
             LEFT JOIN users u ON e.created_by = u.id 
             WHERE e.status = ? 
             ORDER BY e.created_at DESC`, [status], (err, rows) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json(rows);
+        if (err) {
+            console.error('❌ Ошибка загрузки по статусу:', err);
+            return res.status(500).json({ error: err.message });
+        }
+        res.json(rows || []);
     });
 });
 
@@ -242,7 +265,10 @@ app.post('/api/exhibits', authenticateToken, upload.fields([
              VALUES (?, ?, ?, ?, ?, ?, ?)`,
             [title, year, description, mediaUrl, backgroundUrl, status, userId],
             function(err) {
-                if (err) return res.status(500).json({ error: err.message });
+                if (err) {
+                    console.error('❌ Ошибка создания экспоната:', err);
+                    return res.status(500).json({ error: err.message });
+                }
                 res.json({ 
                     id: this.lastID, 
                     status,
@@ -265,7 +291,11 @@ app.put('/api/exhibits/:id', authenticateToken, upload.fields([
     const userId = req.user.id;
     
     db.get(`SELECT * FROM exhibits WHERE id = ?`, [exhibitId], async (err, oldExhibit) => {
-        if (err || !oldExhibit) return res.status(404).json({ error: 'Экспонат не найден' });
+        if (err) {
+            console.error('❌ Ошибка поиска экспоната:', err);
+            return res.status(500).json({ error: err.message });
+        }
+        if (!oldExhibit) return res.status(404).json({ error: 'Экспонат не найден' });
         
         let mediaUrl = oldExhibit.media_path;
         let backgroundUrl = oldExhibit.background_path;
@@ -298,7 +328,10 @@ app.put('/api/exhibits/:id', authenticateToken, upload.fields([
                     `UPDATE exhibits SET title = ?, year = ?, description = ?, media_path = ?, background_path = ? WHERE id = ?`,
                     [title, year, description, mediaUrl, backgroundUrl, exhibitId],
                     function(err) {
-                        if (err) return res.status(500).json({ error: err.message });
+                        if (err) {
+                            console.error('❌ Ошибка обновления экспоната:', err);
+                            return res.status(500).json({ error: err.message });
+                        }
                         res.json({ message: 'Экспонат обновлен' });
                     }
                 );
@@ -308,7 +341,10 @@ app.put('/api/exhibits/:id', authenticateToken, upload.fields([
                      VALUES (?, ?, ?, ?, ?, 'pending_edit', ?, ?)`,
                     [title, year, description, mediaUrl, backgroundUrl, userId, exhibitId],
                     function(err) {
-                        if (err) return res.status(500).json({ error: err.message });
+                        if (err) {
+                            console.error('❌ Ошибка создания правки:', err);
+                            return res.status(500).json({ error: err.message });
+                        }
                         res.json({ message: 'Изменения отправлены на проверку' });
                     }
                 );
@@ -324,11 +360,17 @@ app.delete('/api/admin/exhibits/:id', authenticateToken, isAdmin, (req, res) => 
     const exhibitId = req.params.id;
     
     db.get(`SELECT media_path, background_path FROM exhibits WHERE id = ?`, [exhibitId], (err, exhibit) => {
-        if (err) return res.status(500).json({ error: err.message });
+        if (err) {
+            console.error('❌ Ошибка поиска экспоната:', err);
+            return res.status(500).json({ error: err.message });
+        }
         if (!exhibit) return res.status(404).json({ error: 'Экспонат не найден' });
         
         db.run(`DELETE FROM exhibits WHERE id = ?`, [exhibitId], function(err) {
-            if (err) return res.status(500).json({ error: err.message });
+            if (err) {
+                console.error('❌ Ошибка удаления экспоната:', err);
+                return res.status(500).json({ error: err.message });
+            }
             res.json({ message: 'Экспонат удален' });
         });
     });
@@ -346,7 +388,10 @@ app.post('/api/exhibits/check-duplicate', authenticateToken, (req, res) => {
     }
     
     db.get(query, params, (err, row) => {
-        if (err) return res.status(500).json({ error: err.message });
+        if (err) {
+            console.error('❌ Ошибка проверки дубликата:', err);
+            return res.status(500).json({ error: err.message });
+        }
         res.json({ exists: !!row });
     });
 });
@@ -360,8 +405,11 @@ app.get('/api/admin/pending-creations', authenticateToken, isAdmin, (req, res) =
             LEFT JOIN users u ON e.created_by = u.id 
             WHERE e.status = 'pending_creation' 
             ORDER BY e.created_at DESC`, [], (err, rows) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json(rows);
+        if (err) {
+            console.error('❌ Ошибка загрузки pending-creations:', err);
+            return res.status(500).json({ error: err.message });
+        }
+        res.json(rows || []);
     });
 });
 
@@ -370,8 +418,11 @@ app.get('/api/admin/pending-edits', authenticateToken, isAdmin, (req, res) => {
             LEFT JOIN users u ON e.created_by = u.id 
             WHERE e.status = 'pending_edit' 
             ORDER BY e.created_at DESC`, [], (err, rows) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json(rows);
+        if (err) {
+            console.error('❌ Ошибка загрузки pending-edits:', err);
+            return res.status(500).json({ error: err.message });
+        }
+        res.json(rows || []);
     });
 });
 
@@ -379,13 +430,20 @@ app.post('/api/admin/approve/:id', authenticateToken, isAdmin, (req, res) => {
     const exhibitId = req.params.id;
     
     db.get(`SELECT * FROM exhibits WHERE id = ?`, [exhibitId], (err, pendingExhibit) => {
-        if (err || !pendingExhibit) {
+        if (err) {
+            console.error('❌ Ошибка поиска экспоната:', err);
+            return res.status(500).json({ error: err.message });
+        }
+        if (!pendingExhibit) {
             return res.status(404).json({ error: 'Экспонат не найден' });
         }
         
         if (pendingExhibit.status === 'pending_creation') {
             db.run(`UPDATE exhibits SET status = 'approved' WHERE id = ?`, [exhibitId], function(err) {
-                if (err) return res.status(500).json({ error: err.message });
+                if (err) {
+                    console.error('❌ Ошибка одобрения экспоната:', err);
+                    return res.status(500).json({ error: err.message });
+                }
                 res.json({ message: 'Экспонат одобрен' });
             });
         } else if (pendingExhibit.status === 'pending_edit' && pendingExhibit.original_id) {
@@ -395,11 +453,18 @@ app.post('/api/admin/approve/:id', authenticateToken, isAdmin, (req, res) => {
                 [pendingExhibit.title, pendingExhibit.year, pendingExhibit.description, 
                  pendingExhibit.media_path, pendingExhibit.background_path, pendingExhibit.original_id],
                 function(err) {
-                    if (err) return res.status(500).json({ error: err.message });
-                    db.run(`DELETE FROM exhibits WHERE id = ?`, [exhibitId]);
+                    if (err) {
+                        console.error('❌ Ошибка применения изменений:', err);
+                        return res.status(500).json({ error: err.message });
+                    }
+                    db.run(`DELETE FROM exhibits WHERE id = ?`, [exhibitId], (err) => {
+                        if (err) console.error('❌ Ошибка удаления временной правки:', err);
+                    });
                     res.json({ message: 'Изменения применены' });
                 }
             );
+        } else {
+            res.status(400).json({ error: 'Невозможно одобрить' });
         }
     });
 });
@@ -407,7 +472,10 @@ app.post('/api/admin/approve/:id', authenticateToken, isAdmin, (req, res) => {
 app.post('/api/admin/reject/:id', authenticateToken, isAdmin, (req, res) => {
     const exhibitId = req.params.id;
     db.run(`UPDATE exhibits SET status = 'rejected' WHERE id = ?`, [exhibitId], function(err) {
-        if (err) return res.status(500).json({ error: err.message });
+        if (err) {
+            console.error('❌ Ошибка отклонения экспоната:', err);
+            return res.status(500).json({ error: err.message });
+        }
         res.json({ message: 'Экспонат отклонен' });
     });
 });
@@ -417,8 +485,13 @@ app.post('/api/admin/reject/:id', authenticateToken, isAdmin, (req, res) => {
 // ============================================================================
 
 app.get('/api/admin/editors', authenticateToken, isAdmin, (req, res) => {
+    console.log('📋 Запрос списка редакторов');
+    
     db.all(`SELECT id, username, email, created_at FROM users WHERE role = 'editor'`, [], (err, rows) => {
-        if (err) return res.status(500).json({ error: err.message });
+        if (err) {
+            console.error('❌ Ошибка получения редакторов:', err);
+            return res.status(500).json({ error: err.message });
+        }
         
         const editorsWithPasswords = rows.map(editor => ({
             ...editor,
@@ -458,6 +531,7 @@ app.post('/api/admin/editors', authenticateToken, isAdmin, async (req, res) => {
                 if (err.message.includes('UNIQUE')) {
                     return res.status(400).json({ error: 'Имя пользователя уже занято' });
                 }
+                console.error('❌ Ошибка создания редактора:', err);
                 return res.status(500).json({ error: err.message });
             }
             
@@ -529,11 +603,17 @@ app.put('/api/admin/editors/:id', authenticateToken, isAdmin, (req, res) => {
         `UPDATE users SET ${updates.join(', ')} WHERE id = ? AND role = 'editor'`,
         params,
         function(err) {
-            if (err) return res.status(500).json({ error: err.message });
+            if (err) {
+                console.error('❌ Ошибка обновления редактора:', err);
+                return res.status(500).json({ error: err.message });
+            }
             if (this.changes === 0) return res.status(404).json({ error: 'Редактор не найден' });
             
             db.get(`SELECT id, username, email, created_at FROM users WHERE id = ?`, [editorId], (err, editor) => {
-                if (err) return res.status(500).json({ error: err.message });
+                if (err) {
+                    console.error('❌ Ошибка получения редактора:', err);
+                    return res.status(500).json({ error: err.message });
+                }
                 
                 res.json({ 
                     message: 'Редактор обновлен',
@@ -551,7 +631,10 @@ app.delete('/api/admin/editors/:id', authenticateToken, isAdmin, (req, res) => {
     const editorId = parseInt(req.params.id);
     
     db.run(`DELETE FROM users WHERE id = ? AND role = 'editor'`, [editorId], function(err) {
-        if (err) return res.status(500).json({ error: err.message });
+        if (err) {
+            console.error('❌ Ошибка удаления редактора:', err);
+            return res.status(500).json({ error: err.message });
+        }
         if (this.changes === 0) return res.status(404).json({ error: 'Редактор не найден' });
         
         tempPasswords.delete(editorId);
@@ -565,15 +648,21 @@ app.delete('/api/admin/editors/:id', authenticateToken, isAdmin, (req, res) => {
 
 app.get('/api/admin/applications', authenticateToken, isAdmin, (req, res) => {
     db.all(`SELECT * FROM applications ORDER BY created_at DESC`, [], (err, rows) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json(rows);
+        if (err) {
+            console.error('❌ Ошибка загрузки заявок:', err);
+            return res.status(500).json({ error: err.message });
+        }
+        res.json(rows || []);
     });
 });
 
 app.get('/api/admin/applications/:id', authenticateToken, isAdmin, (req, res) => {
     const id = req.params.id;
     db.get(`SELECT * FROM applications WHERE id = ?`, [id], (err, row) => {
-        if (err) return res.status(500).json({ error: err.message });
+        if (err) {
+            console.error('❌ Ошибка загрузки заявки:', err);
+            return res.status(500).json({ error: err.message });
+        }
         if (!row) return res.status(404).json({ error: 'Заявка не найдена' });
         res.json(row);
     });
@@ -582,7 +671,10 @@ app.get('/api/admin/applications/:id', authenticateToken, isAdmin, (req, res) =>
 app.post('/api/admin/applications/:id/approve', authenticateToken, isAdmin, (req, res) => {
     const applicationId = req.params.id;
     db.run(`UPDATE applications SET status = 'approved' WHERE id = ?`, [applicationId], function(err) {
-        if (err) return res.status(500).json({ error: err.message });
+        if (err) {
+            console.error('❌ Ошибка одобрения заявки:', err);
+            return res.status(500).json({ error: err.message });
+        }
         res.json({ message: 'Заявка одобрена' });
     });
 });
@@ -590,7 +682,10 @@ app.post('/api/admin/applications/:id/approve', authenticateToken, isAdmin, (req
 app.post('/api/admin/applications/:id/reject', authenticateToken, isAdmin, (req, res) => {
     const applicationId = req.params.id;
     db.run(`UPDATE applications SET status = 'rejected' WHERE id = ?`, [applicationId], function(err) {
-        if (err) return res.status(500).json({ error: err.message });
+        if (err) {
+            console.error('❌ Ошибка отклонения заявки:', err);
+            return res.status(500).json({ error: err.message });
+        }
         res.json({ message: 'Заявка отклонена' });
     });
 });
@@ -601,6 +696,15 @@ app.post('/api/admin/applications/:id/reject', authenticateToken, isAdmin, (req,
 
 app.get('/api/test', (req, res) => {
     res.json({ message: 'Сервер работает', time: new Date().toISOString() });
+});
+
+// ============================================================================
+// ОБРАБОТКА ОШИБОК
+// ============================================================================
+
+app.use((err, req, res, next) => {
+    console.error('❌ Необработанная ошибка:', err);
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
 });
 
 // ============================================================================
