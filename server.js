@@ -37,12 +37,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // Обслуживание статических файлов - ВАЖНО для Vercel!
-app.use(express.static(path.join(__dirname, 'public')));
-app.use('/css', express.static(path.join(__dirname, 'public', 'css')));
-app.use('/js', express.static(path.join(__dirname, 'public', 'js')));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-app.use('/views', express.static(path.join(__dirname, 'views')));
-
+app.use(express.static('public')); // Это делает /css и /js доступными
+app.use('/views', express.static('views'));
 // Корневой маршрут
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'views', 'index.html'));
