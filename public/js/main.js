@@ -108,7 +108,7 @@ const NotificationManager = {
 };
 
 // ============================================================================
-// ЗАГРУЗЧИК ФАЙЛОВ
+// ЗАГРУЗЧИК ФАЙЛОВ (ИСПРАВЛЕННАЯ ВЕРСИЯ)
 // ============================================================================
 
 class FileUploader {
@@ -123,79 +123,96 @@ class FileUploader {
     }
     
     createUploadArea(containerId, inputName) {
-    const container = document.getElementById(containerId);
-    if (!container) {
-        console.error(`Контейнер с ID ${containerId} не найден`);
-        return;
-    }
-    
-    const uniqueId = this.generateUniqueId();
-    const fileInputId = `file-${uniqueId}`;
-    const previewId = `preview-${uniqueId}`;
-    
-    const fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.name = inputName;
-    fileInput.id = fileInputId;
-    fileInput.accept = this.accept;
-    fileInput.style.display = 'none';
-    
-    const uploadArea = document.createElement('div');
-    uploadArea.className = 'file-upload-area';
-    uploadArea.innerHTML = `
-        <label for="${fileInputId}" class="upload-placeholder" style="cursor: pointer; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#4ecdc4" stroke-width="2">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                <polyline points="17 8 12 3 7 8"/>
-                <line x1="12" y1="3" x2="12" y2="15"/>
-            </svg>
-            <p>Нажмите для загрузки</p>
-            <small>Макс. 10MB</small>
-        </label>
-        <div class="upload-preview" id="${previewId}" style="display: none;"></div>
-    `;
-    
-    uploadArea.appendChild(fileInput);
-    
-    fileInput.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        
-        if (file.size > this.maxSize) {
-            NotificationManager.show(`Файл слишком большой`, 'error');
+        const container = document.getElementById(containerId);
+        if (!container) {
+            console.log(`Контейнер с ID ${containerId} не найден`);
             return;
         }
         
-        const preview = document.getElementById(previewId);
-        const placeholder = uploadArea.querySelector('.upload-placeholder');
+        // Очищаем контейнер
+        container.innerHTML = '';
         
-        if (file.type.startsWith('image/')) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                preview.innerHTML = `<img src="${e.target.result}" alt="Preview" style="max-width: 100%; max-height: 150px;">`;
-                preview.style.display = 'block';
-                placeholder.style.display = 'none';
-            };
-            reader.readAsDataURL(file);
-        } else if (file.type.startsWith('video/')) {
-            const video = document.createElement('video');
-            video.src = URL.createObjectURL(file);
-            video.controls = true;
-            video.style.maxWidth = '100%';
-            video.style.maxHeight = '150px';
+        const uniqueId = this.generateUniqueId();
+        const fileInputId = `file-${uniqueId}`;
+        const previewId = `preview-${uniqueId}`;
+        
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.name = inputName;
+        fileInput.id = fileInputId;
+        fileInput.accept = this.accept;
+        fileInput.style.display = 'none';
+        
+        const uploadArea = document.createElement('div');
+        uploadArea.className = 'file-upload-area';
+        uploadArea.style.cssText = `
+            border: 2px dashed #4ecdc4;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            min-height: 150px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #0f172a;
+            transition: all 0.3s ease;
+        `;
+        
+        uploadArea.innerHTML = `
+            <label for="${fileInputId}" style="cursor: pointer; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#4ecdc4" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="17 8 12 3 7 8"/>
+                    <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+                <p style="color: #e0e0e0; margin: 10px 0 5px;">Нажмите для загрузки</p>
+                <small style="color: #94a3b8;">Макс. 10MB</small>
+            </label>
+            <div class="upload-preview" id="${previewId}" style="display: none; width: 100%;"></div>
+        `;
+        
+        uploadArea.appendChild(fileInput);
+        
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
             
-            preview.innerHTML = '';
-            preview.appendChild(video);
-            preview.style.display = 'block';
-            placeholder.style.display = 'none';
-        }
+            if (file.size > this.maxSize) {
+                NotificationManager.show(`Файл слишком большой`, 'error');
+                return;
+            }
+            
+            const preview = document.getElementById(previewId);
+            const label = uploadArea.querySelector('label');
+            
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    preview.innerHTML = `<img src="${e.target.result}" alt="Preview" style="max-width: 100%; max-height: 150px; border-radius: 8px;">`;
+                    preview.style.display = 'block';
+                    label.style.display = 'none';
+                };
+                reader.readAsDataURL(file);
+            } else if (file.type.startsWith('video/')) {
+                const video = document.createElement('video');
+                video.src = URL.createObjectURL(file);
+                video.controls = true;
+                video.style.maxWidth = '100%';
+                video.style.maxHeight = '150px';
+                
+                preview.innerHTML = '';
+                preview.appendChild(video);
+                preview.style.display = 'block';
+                label.style.display = 'none';
+            }
+            
+            this.onUpload(file, inputName);
+        });
         
-        this.onUpload(file, inputName);
-    });
-    
-    container.innerHTML = ''; // Очищаем контейнер перед добавлением
-    container.appendChild(uploadArea);
-}
+        container.appendChild(uploadArea);
+    }
 }
 
 // ============================================================================
@@ -209,14 +226,38 @@ function createModal(options = {}) {
     
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.95);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+        padding: 15px;
+    `;
     
     const modal = document.createElement('div');
     modal.className = 'modal-content';
+    modal.style.cssText = `
+        background: #1e293b;
+        border: 2px solid #4ecdc4;
+        border-radius: 20px;
+        padding: 25px 20px;
+        max-width: 900px;
+        width: 100%;
+        max-height: 90vh;
+        overflow-y: auto;
+        position: relative;
+    `;
     modal.style.width = width;
     
     modal.innerHTML = `
-        <button class="modal-close" aria-label="Закрыть">&times;</button>
-        <h2 style="color: #4ecdc4; margin-bottom: 15px; font-size: 1.3rem;">${title}</h2>
+        <button class="modal-close" style="position: absolute; top: 10px; right: 15px; background: none; border: none; color: white; font-size: 2rem; cursor: pointer;">&times;</button>
+        <h2 style="color: #4ecdc4; margin-bottom: 20px; font-size: 1.5rem;">${title}</h2>
         <div class="modal-body">${content}</div>
     `;
     
@@ -294,10 +335,6 @@ async function fetchWithCache(url, cacheKey, forceRefresh = false) {
     }
 }
 
-// ============================================================================
-// ОЧИСТКА КЭША (АБСОЛЮТНО НАДЕЖНАЯ ВЕРСИЯ)
-// ============================================================================
-
 function clearCache(key = null) {
     if (!AppCache || !AppCache.lastFetch) return;
     
@@ -311,7 +348,6 @@ function clearCache(key = null) {
         return;
     }
     
-    // Очищаем все кэши
     const cacheKeys = ['exhibits', 'editors', 'applications'];
     cacheKeys.forEach(k => {
         if (AppCache.hasOwnProperty(k)) {

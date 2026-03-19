@@ -107,36 +107,34 @@ function openCreateModal() {
     const titleId = generateUniqueId('title');
     const yearId = generateUniqueId('year');
     const descId = generateUniqueId('desc');
-    const mediaContainerId = generateUniqueId('media-container');
-    const backgroundContainerId = generateUniqueId('background-container');
     
     const modalContent = `
-        <div class="create-exhibit-form">
+        <div class="create-exhibit-form" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
             <div class="form-left">
-                <div class="form-group">
-                    <label for="${titleId}">Название *</label>
-                    <input type="text" id="${titleId}" class="exhibit-title" required placeholder="Apple Macintosh">
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label for="${titleId}" style="color: #4ecdc4; display: block; margin-bottom: 5px;">Название *</label>
+                    <input type="text" id="${titleId}" class="exhibit-title" required placeholder="Apple Macintosh" style="width: 100%; padding: 10px; background: #1e293b; border: 1px solid #334155; border-radius: 6px; color: white;">
                 </div>
-                <div class="form-group">
-                    <label for="${yearId}">Год *</label>
-                    <input type="number" id="${yearId}" class="exhibit-year" required placeholder="1984">
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label for="${yearId}" style="color: #4ecdc4; display: block; margin-bottom: 5px;">Год *</label>
+                    <input type="number" id="${yearId}" class="exhibit-year" required placeholder="1984" style="width: 100%; padding: 10px; background: #1e293b; border: 1px solid #334155; border-radius: 6px; color: white;">
                 </div>
-                <div class="form-group">
-                    <label for="${descId}">Описание *</label>
-                    <textarea id="${descId}" class="exhibit-description" required placeholder="Описание..."></textarea>
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label for="${descId}" style="color: #4ecdc4; display: block; margin-bottom: 5px;">Описание *</label>
+                    <textarea id="${descId}" class="exhibit-description" required placeholder="Описание..." style="width: 100%; padding: 10px; background: #1e293b; border: 1px solid #334155; border-radius: 6px; color: white; min-height: 120px;"></textarea>
                 </div>
             </div>
             <div class="form-right">
-                <div class="form-group">
-                    <label>Медиафайл *</label>
-                    <div id="${mediaContainerId}" class="media-upload-container"></div>
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label style="color: #4ecdc4; display: block; margin-bottom: 5px;">Медиафайл *</label>
+                    <div id="media-upload-container" style="width: 100%;"></div>
                 </div>
-                <div class="form-group">
-                    <label>Фон (необязательно)</label>
-                    <div id="${backgroundContainerId}" class="background-upload-container"></div>
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label style="color: #4ecdc4; display: block; margin-bottom: 5px;">Фон (необязательно)</label>
+                    <div id="background-upload-container" style="width: 100%;"></div>
                 </div>
             </div>
-            <button class="submit-btn" id="create-exhibit-btn">✨ Создать</button>
+            <button class="submit-btn" id="create-exhibit-btn" style="grid-column: span 2; padding: 15px; background: linear-gradient(45deg, #4ecdc4, #2a9d8f); border: none; border-radius: 30px; color: white; font-weight: bold; font-size: 1.1rem; cursor: pointer; margin-top: 10px;">✨ Создать</button>
         </div>
     `;
     
@@ -146,9 +144,9 @@ function openCreateModal() {
         width: '900px'
     });
     
-    // Инициализация загрузчиков с правильными ID
+    // Даем время DOM обновиться
     setTimeout(() => {
-        initCreateUploaders(mediaContainerId, backgroundContainerId);
+        initCreateUploaders();
     }, 100);
     
     document.getElementById('create-exhibit-btn').addEventListener('click', async () => {
@@ -193,6 +191,22 @@ function openCreateModal() {
             NotificationManager.show('Ошибка соединения', 'error');
         }
     });
+}
+
+function initCreateUploaders() {
+    console.log('Инициализация загрузчиков...');
+    
+    const mediaUploader = new FileUploader({
+        onUpload: (file) => console.log('Медиа:', file.name)
+    });
+    
+    const bgUploader = new FileUploader({
+        onUpload: (file) => console.log('Фон:', file.name),
+        accept: 'image/*'
+    });
+    
+    mediaUploader.createUploadArea('media-upload-container', 'media');
+    bgUploader.createUploadArea('background-upload-container', 'background');
 }
 
 // Обновленная функция инициализации загрузчиков
