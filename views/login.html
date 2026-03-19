@@ -2,15 +2,16 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
     <title>Вход - Музей технологий</title>
     <link rel="stylesheet" href="/css/style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
 </head>
 <body class="login-page">
-    <div class="background-overlay" style="background: linear-gradient(135deg, #0a0f1e, #1a1f30);"></div>
+    <div class="background-overlay"></div>
     
     <header class="site-header">
-        <a href="/views/index.html" class="home-link">🏠 Главная</a>
+        <a href="/views/index.html" class="home-link">🏠 <span>Главная</span></a>
         <a href="/views/login.html" class="btn-login">Вход</a>
     </header>
     
@@ -49,7 +50,7 @@
                 
                 if (response.ok && data.success) {
                     if (window.NotificationManager) {
-                        window.NotificationManager.show('Вход выполнен успешно!', 'success');
+                        window.NotificationManager.show('Вход выполнен!', 'success');
                     }
                     
                     window.dispatchEvent(new Event('authChange'));
@@ -61,8 +62,7 @@
                     errorEl.textContent = data.error || 'Ошибка входа';
                 }
             } catch (error) {
-                console.error('Ошибка:', error);
-                errorEl.textContent = 'Ошибка соединения с сервером';
+                errorEl.textContent = 'Ошибка соединения';
             }
         });
     </script>

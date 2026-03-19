@@ -1,17 +1,21 @@
 const express = require('express');
-const session = require('express-session');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const cookieParser = require('cookie-parser');
 const db = require('./database');
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
+
+// Секретный ключ для JWT (в продакшене берется из переменных окружения)
+const JWT_SECRET = process.env.JWT_SECRET || 'museum-secret-key-2026';
 
 // Настройка multer для загрузки файлов
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        let uploadPath = 'public/uploads/';
+        let uploadPath = 'uploads/';
         if (file.fieldname === 'media') {
             uploadPath += 'exhibits/';
         } else if (file.fieldname === 'background') {
@@ -30,33 +34,46 @@ const upload = multer({ storage: storage });
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(session({
-    secret: 'your-secret-key-museum',
-    resave: false,
-    saveUninitialized: false,
-    cookie: { secure: false }
-}));
-app.use(express.static('public'));
-app.use('/views', express.static('views'));
+app.use(cookieParser());
 
-// Middleware для проверки авторизации
-const isAuthenticated = (req, res, next) => {
-    if (req.session.user) {
-        next();
-    } else {
-        res.status(401).json({ error: 'Не авторизован' });
+// Обслуживание статических файлов - ВАЖНО для Vercel!
+app.use(express.static(path.join(__dirname, 'public')));
+app.use('/css', express.static(path.join(__dirname, 'public', 'css')));
+app.use('/js', express.static(path.join(__dirname, 'public', 'js')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/views', express.static(path.join(__dirname, 'views')));
+
+// Корневой маршрут
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'views', 'index.html'));
+});
+
+// Middleware для проверки JWT
+const authenticateToken = (req, res, next) => {
+    const token = req.cookies.token || req.headers['authorization']?.split(' ')[1];
+    
+    if (!token) {
+        return res.status(401).json({ error: 'Не авторизован' });
     }
+
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+        if (err) {
+            return res.status(403).json({ error: 'Токен недействителен' });
+        }
+        req.user = user;
+        next();
+    });
 };
 
 const isAdmin = (req, res, next) => {
-    if (req.session.user && req.session.user.role === 'admin') {
+    if (req.user && req.user.role === 'admin') {
         next();
     } else {
         res.status(403).json({ error: 'Доступ запрещен' });
     }
 };
 
-// Маршруты для авторизации
+// ============= АВТОРИЗАЦИЯ =============
 app.post('/api/login', (req, res) => {
     const { username, password } = req.body;
     
@@ -67,35 +84,34 @@ app.post('/api/login', (req, res) => {
         bcrypt.compare(password, user.password, (err, isValid) => {
             if (err || !isValid) return res.status(401).json({ error: 'Неверный логин или пароль' });
             
-            req.session.user = {
-                id: user.id,
-                username: user.username,
-                role: user.role
-            };
+            const token = jwt.sign(
+                { id: user.id, username: user.username, role: user.role },
+                JWT_SECRET,
+                { expiresIn: '7d' }
+            );
             
-            res.json({ 
-                success: true, 
-                role: user.role,
-                message: 'Вход выполнен'
+            res.cookie('token', token, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
+                maxAge: 7 * 24 * 60 * 60 * 1000
             });
+            
+            res.json({ success: true, role: user.role });
         });
     });
 });
 
 app.post('/api/logout', (req, res) => {
-    req.session.destroy();
+    res.clearCookie('token');
     res.json({ success: true });
 });
 
-app.get('/api/me', (req, res) => {
-    if (req.session.user) {
-        res.json({ user: req.session.user });
-    } else {
-        res.status(401).json({ error: 'Не авторизован' });
-    }
+app.get('/api/me', authenticateToken, (req, res) => {
+    res.json({ user: req.user });
 });
 
-// Маршруты для экспонатов
+// ============= ЭКСПОНАТЫ =============
 app.get('/api/exhibits', (req, res) => {
     db.all(`SELECT * FROM exhibits WHERE status = 'approved' ORDER BY year ASC`, [], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -103,7 +119,7 @@ app.get('/api/exhibits', (req, res) => {
     });
 });
 
-app.get('/api/exhibits/all', isAuthenticated, (req, res) => {
+app.get('/api/exhibits/all', authenticateToken, (req, res) => {
     db.all(`SELECT e.*, u.username as creator_name FROM exhibits e 
             LEFT JOIN users u ON e.created_by = u.id 
             ORDER BY e.year ASC`, [], (err, rows) => {
@@ -121,32 +137,21 @@ app.get('/api/exhibits/:id', (req, res) => {
     });
 });
 
-app.get('/api/exhibits/status/:status', isAuthenticated, (req, res) => {
-    const status = req.params.status;
-    db.all(`SELECT e.*, u.username as creator_name FROM exhibits e 
-            LEFT JOIN users u ON e.created_by = u.id 
-            WHERE e.status = ? 
-            ORDER BY e.created_at DESC`, [status], (err, rows) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json(rows);
-    });
-});
-
-app.post('/api/exhibits', isAuthenticated, upload.fields([{ name: 'media', maxCount: 1 }, { name: 'background', maxCount: 1 }]), (req, res) => {
+app.post('/api/exhibits', authenticateToken, upload.fields([{ name: 'media', maxCount: 1 }, { name: 'background', maxCount: 1 }]), (req, res) => {
     const { title, year, description } = req.body;
-    const userId = req.session.user.id;
+    const userId = req.user.id;
     
     let mediaPath = null;
     let backgroundPath = null;
     
-    if (req.files && req.files['media']) {
-        mediaPath = '/uploads/exhibits/' + req.files['media'][0].filename;
+    if (req.files?.media) {
+        mediaPath = '/uploads/exhibits/' + req.files.media[0].filename;
     }
-    if (req.files && req.files['background']) {
-        backgroundPath = '/uploads/backgrounds/' + req.files['background'][0].filename;
+    if (req.files?.background) {
+        backgroundPath = '/uploads/backgrounds/' + req.files.background[0].filename;
     }
     
-    const status = req.session.user.role === 'admin' ? 'approved' : 'pending_creation';
+    const status = req.user.role === 'admin' ? 'approved' : 'pending_creation';
     
     db.run(
         `INSERT INTO exhibits (title, year, description, media_path, background_path, status, created_by) 
@@ -163,10 +168,10 @@ app.post('/api/exhibits', isAuthenticated, upload.fields([{ name: 'media', maxCo
     );
 });
 
-app.put('/api/exhibits/:id', isAuthenticated, upload.fields([{ name: 'media', maxCount: 1 }, { name: 'background', maxCount: 1 }]), (req, res) => {
+app.put('/api/exhibits/:id', authenticateToken, upload.fields([{ name: 'media', maxCount: 1 }, { name: 'background', maxCount: 1 }]), (req, res) => {
     const exhibitId = req.params.id;
     const { title, year, description } = req.body;
-    const userId = req.session.user.id;
+    const userId = req.user.id;
     
     db.get(`SELECT * FROM exhibits WHERE id = ?`, [exhibitId], (err, oldExhibit) => {
         if (err || !oldExhibit) return res.status(404).json({ error: 'Экспонат не найден' });
@@ -174,16 +179,16 @@ app.put('/api/exhibits/:id', isAuthenticated, upload.fields([{ name: 'media', ma
         let mediaPath = oldExhibit.media_path;
         let backgroundPath = oldExhibit.background_path;
         
-        if (req.files && req.files['media']) {
-            mediaPath = '/uploads/exhibits/' + req.files['media'][0].filename;
+        if (req.files?.media) {
+            mediaPath = '/uploads/exhibits/' + req.files.media[0].filename;
         }
-        if (req.files && req.files['background']) {
-            backgroundPath = '/uploads/backgrounds/' + req.files['background'][0].filename;
+        if (req.files?.background) {
+            backgroundPath = '/uploads/backgrounds/' + req.files.background[0].filename;
         }
         
-        if (req.session.user.role === 'admin') {
+        if (req.user.role === 'admin') {
             db.run(
-                `UPDATE exhibits SET title = ?, year = ?, description = ?, media_path = ?, background_path = ?, status = 'approved' WHERE id = ?`,
+                `UPDATE exhibits SET title = ?, year = ?, description = ?, media_path = ?, background_path = ? WHERE id = ?`,
                 [title, year, description, mediaPath, backgroundPath, exhibitId],
                 function(err) {
                     if (err) return res.status(500).json({ error: err.message });
@@ -204,8 +209,7 @@ app.put('/api/exhibits/:id', isAuthenticated, upload.fields([{ name: 'media', ma
     });
 });
 
-// Удаление экспоната (только для админа)
-app.delete('/api/admin/exhibits/:id', isAdmin, (req, res) => {
+app.delete('/api/admin/exhibits/:id', authenticateToken, isAdmin, (req, res) => {
     const exhibitId = req.params.id;
     
     db.get(`SELECT media_path, background_path FROM exhibits WHERE id = ?`, [exhibitId], (err, exhibit) => {
@@ -213,11 +217,11 @@ app.delete('/api/admin/exhibits/:id', isAdmin, (req, res) => {
         if (!exhibit) return res.status(404).json({ error: 'Экспонат не найден' });
         
         if (exhibit.media_path) {
-            const mediaPath = path.join(__dirname, 'public', exhibit.media_path);
+            const mediaPath = path.join(__dirname, exhibit.media_path);
             if (fs.existsSync(mediaPath)) fs.unlinkSync(mediaPath);
         }
         if (exhibit.background_path) {
-            const bgPath = path.join(__dirname, 'public', exhibit.background_path);
+            const bgPath = path.join(__dirname, exhibit.background_path);
             if (fs.existsSync(bgPath)) fs.unlinkSync(bgPath);
         }
         
@@ -228,8 +232,7 @@ app.delete('/api/admin/exhibits/:id', isAdmin, (req, res) => {
     });
 });
 
-// Проверка на дубликат
-app.post('/api/exhibits/check-duplicate', isAuthenticated, (req, res) => {
+app.post('/api/exhibits/check-duplicate', authenticateToken, (req, res) => {
     const { title, year, description, excludeId } = req.body;
     
     let query = `SELECT id FROM exhibits WHERE title = ? AND year = ? AND description = ?`;
@@ -246,8 +249,8 @@ app.post('/api/exhibits/check-duplicate', isAuthenticated, (req, res) => {
     });
 });
 
-// Маршруты для админа (проверка экспонатов)
-app.get('/api/admin/pending-creations', isAdmin, (req, res) => {
+// ============= АДМИН: ПРОВЕРКА ЭКСПОНАТОВ =============
+app.get('/api/admin/pending-creations', authenticateToken, isAdmin, (req, res) => {
     db.all(`SELECT e.*, u.username as creator_name FROM exhibits e 
             LEFT JOIN users u ON e.created_by = u.id 
             WHERE e.status = 'pending_creation' 
@@ -257,7 +260,7 @@ app.get('/api/admin/pending-creations', isAdmin, (req, res) => {
     });
 });
 
-app.get('/api/admin/pending-edits', isAdmin, (req, res) => {
+app.get('/api/admin/pending-edits', authenticateToken, isAdmin, (req, res) => {
     db.all(`SELECT e.*, u.username as creator_name FROM exhibits e 
             LEFT JOIN users u ON e.created_by = u.id 
             WHERE e.status = 'pending_edit' 
@@ -267,7 +270,7 @@ app.get('/api/admin/pending-edits', isAdmin, (req, res) => {
     });
 });
 
-app.post('/api/admin/approve/:id', isAdmin, (req, res) => {
+app.post('/api/admin/approve/:id', authenticateToken, isAdmin, (req, res) => {
     const exhibitId = req.params.id;
     
     db.get(`SELECT * FROM exhibits WHERE id = ?`, [exhibitId], (err, pendingExhibit) => {
@@ -276,49 +279,27 @@ app.post('/api/admin/approve/:id', isAdmin, (req, res) => {
         }
         
         if (pendingExhibit.status === 'pending_creation') {
-            // Просто одобряем новый экспонат
             db.run(`UPDATE exhibits SET status = 'approved' WHERE id = ?`, [exhibitId], function(err) {
                 if (err) return res.status(500).json({ error: err.message });
-                res.json({ message: 'Экспонат одобрен и опубликован' });
+                res.json({ message: 'Экспонат одобрен' });
             });
-            
         } else if (pendingExhibit.status === 'pending_edit' && pendingExhibit.original_id) {
-            // Обновляем оригинальный экспонат данными из правки
             db.run(
-                `UPDATE exhibits SET 
-                    title = ?, 
-                    year = ?, 
-                    description = ?, 
-                    media_path = ?, 
-                    background_path = ?, 
-                    status = 'approved' 
+                `UPDATE exhibits SET title = ?, year = ?, description = ?, media_path = ?, background_path = ? 
                  WHERE id = ?`,
-                [
-                    pendingExhibit.title, 
-                    pendingExhibit.year, 
-                    pendingExhibit.description, 
-                    pendingExhibit.media_path, 
-                    pendingExhibit.background_path, 
-                    pendingExhibit.original_id
-                ],
+                [pendingExhibit.title, pendingExhibit.year, pendingExhibit.description, 
+                 pendingExhibit.media_path, pendingExhibit.background_path, pendingExhibit.original_id],
                 function(err) {
                     if (err) return res.status(500).json({ error: err.message });
-                    
-                    // Удаляем временную правку
-                    db.run(`DELETE FROM exhibits WHERE id = ?`, [exhibitId], function(err) {
-                        if (err) {
-                            console.error('Ошибка при удалении временной правки:', err);
-                        }
-                    });
-                    
-                    res.json({ message: 'Изменения применены к экспонату' });
+                    db.run(`DELETE FROM exhibits WHERE id = ?`, [exhibitId]);
+                    res.json({ message: 'Изменения применены' });
                 }
             );
         }
     });
 });
 
-app.post('/api/admin/reject/:id', isAdmin, (req, res) => {
+app.post('/api/admin/reject/:id', authenticateToken, isAdmin, (req, res) => {
     const exhibitId = req.params.id;
     db.run(`UPDATE exhibits SET status = 'rejected' WHERE id = ?`, [exhibitId], function(err) {
         if (err) return res.status(500).json({ error: err.message });
@@ -326,15 +307,15 @@ app.post('/api/admin/reject/:id', isAdmin, (req, res) => {
     });
 });
 
-// Маршруты для работы с редакторами
-app.get('/api/admin/editors', isAdmin, (req, res) => {
+// ============= РЕДАКТОРЫ =============
+app.get('/api/admin/editors', authenticateToken, isAdmin, (req, res) => {
     db.all(`SELECT id, username, created_at FROM users WHERE role = 'editor'`, [], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(rows);
     });
 });
 
-app.delete('/api/admin/editors/:id', isAdmin, (req, res) => {
+app.delete('/api/admin/editors/:id', authenticateToken, isAdmin, (req, res) => {
     const editorId = req.params.id;
     db.run(`DELETE FROM users WHERE id = ? AND role = 'editor'`, [editorId], function(err) {
         if (err) return res.status(500).json({ error: err.message });
@@ -342,7 +323,7 @@ app.delete('/api/admin/editors/:id', isAdmin, (req, res) => {
     });
 });
 
-app.post('/api/admin/editors', isAdmin, async (req, res) => {
+app.post('/api/admin/editors', authenticateToken, isAdmin, async (req, res) => {
     const { username, password, email, telegramId } = req.body;
     
     if (!username || !password) return res.status(400).json({ error: 'Логин и пароль обязательны' });
@@ -359,39 +340,33 @@ app.post('/api/admin/editors', isAdmin, async (req, res) => {
                 return res.status(500).json({ error: err.message });
             }
             
-            const editorId = this.lastID;
             let telegramSent = false;
-            
             if (telegramId) {
                 try {
                     const { sendCredentialsToUser } = require('./telegramBot');
                     await sendCredentialsToUser(telegramId, username, password);
                     telegramSent = true;
-                } catch (telegramError) {
-                    console.error('Ошибка отправки через Telegram:', telegramError.message);
-                }
+                } catch (e) {}
             }
             
             res.json({ 
-                id: editorId,
-                message: telegramSent 
-                    ? 'Редактор создан. Данные отправлены в Telegram.' 
-                    : 'Редактор создан, но Telegram не отправлен.',
-                telegramSent: telegramSent
+                id: this.lastID,
+                message: telegramSent ? 'Редактор создан. Данные отправлены в Telegram.' : 'Редактор создан.',
+                telegramSent
             });
         }
     );
 });
 
-// Маршруты для заявок
-app.get('/api/admin/applications', isAdmin, (req, res) => {
+// ============= ЗАЯВКИ =============
+app.get('/api/admin/applications', authenticateToken, isAdmin, (req, res) => {
     db.all(`SELECT * FROM applications ORDER BY created_at DESC`, [], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(rows);
     });
 });
 
-app.get('/api/admin/applications/:id', isAdmin, (req, res) => {
+app.get('/api/admin/applications/:id', authenticateToken, isAdmin, (req, res) => {
     const id = req.params.id;
     db.get(`SELECT * FROM applications WHERE id = ?`, [id], (err, row) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -400,33 +375,36 @@ app.get('/api/admin/applications/:id', isAdmin, (req, res) => {
     });
 });
 
-app.post('/api/admin/applications/:id/approve', isAdmin, (req, res) => {
+app.post('/api/admin/applications/:id/approve', authenticateToken, isAdmin, (req, res) => {
     const applicationId = req.params.id;
     db.run(`UPDATE applications SET status = 'approved' WHERE id = ?`, [applicationId], function(err) {
         if (err) return res.status(500).json({ error: err.message });
-        res.json({ message: 'Заявка одобрена', id: applicationId });
+        res.json({ message: 'Заявка одобрена' });
     });
 });
 
-app.post('/api/admin/applications/:id/reject', isAdmin, (req, res) => {
+app.post('/api/admin/applications/:id/reject', authenticateToken, isAdmin, (req, res) => {
     const applicationId = req.params.id;
     db.run(`UPDATE applications SET status = 'rejected' WHERE id = ?`, [applicationId], function(err) {
         if (err) return res.status(500).json({ error: err.message });
-        res.json({ message: 'Заявка отклонена', id: applicationId });
+        res.json({ message: 'Заявка отклонена' });
     });
 });
 
-// Запуск сервера
+// Тестовый маршрут
+app.get('/api/test', (req, res) => {
+    res.json({ message: 'Сервер работает', time: new Date().toISOString() });
+});
+
+// ============= ЗАПУСК =============
 app.listen(PORT, () => {
-    console.log(`✅ Сервер запущен на http://localhost:${PORT}`);
-    console.log(`🌐 Главная страница: http://localhost:${PORT}/views/index.html`);
-    console.log(`🔑 Тестовый админ: admin / admin123`);
+    console.log(`✅ Сервер запущен на порту ${PORT}`);
+    console.log(`🌐 Главная страница: http://localhost:${PORT}/`);
     
     try {
         require('./telegramBot');
-        console.log('✅ Telegram бот загружен');
-    } catch (error) {
-        console.log('⚠️ Ошибка при загрузке Telegram бота:', error.message);
+    } catch (e) {
+        console.log('⚠️ Telegram бот не загружен');
     }
 });
 
