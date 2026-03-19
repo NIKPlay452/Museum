@@ -157,6 +157,24 @@ app.get('/api/exhibits/:id', (req, res) => {
     });
 });
 
+// Получение экспонатов по статусу
+app.get('/api/exhibits/status/:status', authenticateToken, (req, res) => {
+    const status = req.params.status;
+    const validStatuses = ['pending_creation', 'pending_edit', 'approved', 'rejected'];
+    
+    if (!validStatuses.includes(status)) {
+        return res.status(400).json({ error: 'Неверный статус' });
+    }
+    
+    db.all(`SELECT e.*, u.username as creator_name FROM exhibits e 
+            LEFT JOIN users u ON e.created_by = u.id 
+            WHERE e.status = ? 
+            ORDER BY e.created_at DESC`, [status], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows);
+    });
+});
+
 app.post('/api/exhibits', authenticateToken, upload.fields([{ name: 'media', maxCount: 1 }, { name: 'background', maxCount: 1 }]), (req, res) => {
     const { title, year, description } = req.body;
     const userId = req.user.id;
