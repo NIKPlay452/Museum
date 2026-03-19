@@ -631,6 +631,8 @@ async function loadStatusList(status, container) {
   }
 }
 
+// ============= НОВЫЙ КОД ДЛЯ РЕДАКТОРОВ =============
+
 // Работа с редакторами
 async function openEditorsModal() {
   const modalContent = `
@@ -645,7 +647,7 @@ async function openEditorsModal() {
   const modal = createModal({
     title: '👥 Управление редакторами',
     content: modalContent,
-    width: '600px'
+    width: '700px'
   });
   
   document.getElementById('create-editor-btn').addEventListener('click', () => {
@@ -655,7 +657,7 @@ async function openEditorsModal() {
   await loadEditorsList();
 }
 
-// Загрузка списка редакторов (исправленная версия)
+// Загрузка списка редакторов с красивым отображением
 async function loadEditorsList() {
   const container = document.getElementById('editors-list-container');
   if (!container) return;
@@ -670,41 +672,56 @@ async function loadEditorsList() {
       throw new Error(errorData.error || `HTTP ошибка ${response.status}`);
     }
     
-    const data = await response.json();
-    console.log('📦 Данные редакторов:', data);
+    const editors = await response.json();
     
-    // Проверяем, что data - это массив
-    if (!Array.isArray(data)) {
-      console.error('❌ Сервер вернул не массив:', data);
+    if (!Array.isArray(editors)) {
       container.innerHTML = '<p style="color: #ff6b6b;">Ошибка: сервер вернул некорректные данные</p>';
       return;
     }
     
-    if (data.length === 0) {
+    if (editors.length === 0) {
       container.innerHTML = '<p style="color: #94a3b8; text-align: center;">Нет редакторов</p>';
       return;
     }
     
-    let html = '<div class="editors-grid">';
+    let html = '<div class="editors-list">';
     
-    data.forEach(editor => {
+    editors.forEach(editor => {
       const date = editor.created_at ? new Date(editor.created_at).toLocaleDateString('ru-RU') : 'неизвестно';
       
       html += `
         <div class="editor-card" data-id="${editor.id}" style="
           background: #0f172a;
-          border-left: 4px solid #4ecdc4;
+          border: 1px solid #334155;
+          border-radius: 12px;
           padding: 20px;
           margin-bottom: 15px;
-          border-radius: 8px;
         ">
-          <div style="display: flex; justify-content: space-between; align-items: start;">
-            <div style="flex: 1;">
-              <h3 style="color: #4ecdc4; margin-bottom: 10px;">${editor.username}</h3>
-              <p><span style="color: #94a3b8;">Email:</span> ${editor.email || 'Не указан'}</p>
-              <p><span style="color: #94a3b8;">Создан:</span> ${date}</p>
+          <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px;">
+            <div>
+              <h3 style="color: #4ecdc4; margin: 0 0 5px 0;">${editor.username}</h3>
+              <p style="color: #94a3b8; margin: 0;">ID: ${editor.id} • Создан: ${date}</p>
             </div>
-            <button class="delete-editor" onclick="deleteEditor(${editor.id})" style="margin-left: 15px;">Удалить</button>
+            <div style="display: flex; gap: 10px;">
+              <button class="admin-btn" onclick="editEditor(${editor.id})" style="padding: 8px 15px;">✏️</button>
+              <button class="delete-editor" onclick="deleteEditor(${editor.id})" style="padding: 8px 15px;">🗑️</button>
+            </div>
+          </div>
+          
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; background: #1a1f30; padding: 15px; border-radius: 8px;">
+            <div>
+              <p style="color: #94a3b8; margin: 0 0 5px 0;">Email</p>
+              <p style="color: #e0e0e0; margin: 0;">${editor.email || 'Не указан'}</p>
+            </div>
+            <div>
+              <p style="color: #94a3b8; margin: 0 0 5px 0;">Пароль</p>
+              <p style="color: #e0e0e0; margin: 0; font-family: monospace;">
+                <span class="password-hidden" onclick="togglePassword(this, '${editor.id}')" style="cursor: pointer; background: #0f172a; padding: 3px 10px; border-radius: 4px;">
+                  ••••••••
+                </span>
+                <span class="password-visible-${editor.id}" style="display: none;">Загрузка...</span>
+              </p>
+            </div>
           </div>
         </div>
       `;
@@ -719,22 +736,107 @@ async function loadEditorsList() {
   }
 }
 
-// Функция для показа/скрытия пароля
-window.togglePassword = function(element) {
-  const hidden = element;
-  const visible = element.nextElementSibling;
-  
-  if (hidden.style.display !== 'none') {
-    hidden.style.display = 'none';
-    visible.style.display = 'inline';
+// Функция для показа пароля
+window.togglePassword = function(element, editorId) {
+  const visibleSpan = document.querySelector(`.password-visible-${editorId}`);
+  if (visibleSpan) {
+    element.style.display = 'none';
+    visibleSpan.style.display = 'inline';
+    
+    // Здесь можно сделать запрос к серверу для получения пароля
+    // Пока показываем заглушку
+    visibleSpan.textContent = '••••••••';
+    
     setTimeout(() => {
-      hidden.style.display = 'inline';
-      visible.style.display = 'none';
+      element.style.display = 'inline';
+      visibleSpan.style.display = 'none';
     }, 3000);
   }
 };
 
-// Создание редактора 
+// Функция редактирования редактора
+window.editEditor = async (id) => {
+  try {
+    const response = await fetch('/api/admin/editors');
+    const editors = await response.json();
+    const editor = editors.find(e => e.id === id);
+    
+    if (!editor) {
+      NotificationManager.show('Редактор не найден', 'error');
+      return;
+    }
+    
+    const modalContent = `
+      <div class="create-exhibit-form" style="grid-template-columns: 1fr;">
+        <div class="form-group">
+          <label>Имя пользователя (логин)</label>
+          <input type="text" id="edit-username" value="${editor.username}" required>
+        </div>
+        
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="edit-email" value="${editor.email || ''}">
+        </div>
+        
+        <div class="form-group">
+          <label>Новый пароль (оставьте пустым, чтобы не менять)</label>
+          <input type="text" id="edit-password" placeholder="Введите новый пароль">
+        </div>
+        
+        <button class="submit-btn" id="save-editor-changes-btn">💾 Сохранить изменения</button>
+      </div>
+    `;
+    
+    const modal = createModal({
+      title: '✏️ Редактирование редактора',
+      content: modalContent,
+      width: '500px'
+    });
+    
+    document.getElementById('save-editor-changes-btn').addEventListener('click', async () => {
+      const newUsername = document.getElementById('edit-username').value;
+      const newEmail = document.getElementById('edit-email').value;
+      const newPassword = document.getElementById('edit-password').value;
+      
+      const updateData = {};
+      if (newUsername !== editor.username) updateData.username = newUsername;
+      if (newEmail !== editor.email) updateData.email = newEmail;
+      if (newPassword) updateData.password = newPassword;
+      
+      if (Object.keys(updateData).length === 0) {
+        NotificationManager.show('Нет изменений', 'info');
+        modal.close();
+        return;
+      }
+      
+      try {
+        const response = await fetch(`/api/admin/editors/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updateData),
+          credentials: 'include'
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          NotificationManager.show('Редактор обновлен', 'success');
+          modal.close();
+          await loadEditorsList();
+        } else {
+          NotificationManager.show(data.error || 'Ошибка обновления', 'error');
+        }
+      } catch (error) {
+        NotificationManager.show('Ошибка соединения', 'error');
+      }
+    });
+    
+  } catch (error) {
+    NotificationManager.show('Ошибка загрузки данных', 'error');
+  }
+};
+
+// Создание редактора
 function openCreateEditorModal() {
   const modalContent = `
     <div class="create-exhibit-form" style="grid-template-columns: 1fr;">
@@ -803,7 +905,7 @@ function openCreateEditorModal() {
           'success'
         );
         modal.close();
-        await loadEditorsList(); // Перезагружаем список
+        await loadEditorsList();
       } else {
         NotificationManager.show(data.error || 'Ошибка создания', 'error');
       }
@@ -812,6 +914,55 @@ function openCreateEditorModal() {
     }
   });
 }
+
+// Удаление редактора с красивым подтверждением
+window.deleteEditor = async (id) => {
+  const confirmContent = `
+    <div style="text-align: center; padding: 20px;">
+      <div style="font-size: 48px; margin-bottom: 20px;">⚠️</div>
+      <h3 style="color: #ff6b6b; margin-bottom: 15px;">Удаление редактора</h3>
+      <p style="color: #e0e0e0; margin-bottom: 25px;">Вы уверены, что хотите удалить этого редактора?</p>
+      <div style="display: flex; gap: 15px; justify-content: center;">
+        <button class="approve-btn" id="confirm-delete-yes" style="background: #ff6b6b; color: white;">Да, удалить</button>
+        <button class="reject-btn" id="confirm-delete-no" style="background: #4ecdc4; color: #0f172a;">Нет, отмена</button>
+      </div>
+    </div>
+  `;
+  
+  const confirmModal = createModal({
+    title: '⚠️ Подтверждение',
+    content: confirmContent,
+    width: '400px'
+  });
+  
+  document.getElementById('confirm-delete-yes').addEventListener('click', async () => {
+    confirmModal.close();
+    
+    try {
+      const response = await fetch(`/api/admin/editors/${id}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Ошибка удаления');
+      }
+      
+      NotificationManager.show('Редактор удален', 'success');
+      await loadEditorsList();
+      
+    } catch (error) {
+      NotificationManager.show(error.message, 'error');
+    }
+  });
+  
+  document.getElementById('confirm-delete-no').addEventListener('click', () => {
+    confirmModal.close();
+  });
+};
+
+// ============= КОНЕЦ НОВОГО КОДА =============
 
 // Просмотр заявок
 async function openApplicationsModal() {
@@ -891,7 +1042,7 @@ async function openApplicationsModal() {
   }
 }
 
-// Открыть модальное окно создания редактора из заявки (обновленная версия)
+// Открыть модальное окно создания редактора из заявки
 window.openCreateEditorFromApplicationModal = async (id) => {
   // Сначала показываем подтверждение
   const confirmContent = `
@@ -919,7 +1070,6 @@ window.openCreateEditorFromApplicationModal = async (id) => {
       const response = await fetch(`/api/admin/applications/${id}`);
       const application = await response.json();
       
-      // Генерируем обычный пароль (НЕ ХЕШ)
       const plainPassword = generatePassword();
       
       const modalContent = `
@@ -958,13 +1108,12 @@ window.openCreateEditorFromApplicationModal = async (id) => {
       document.getElementById('save-editor-btn').addEventListener('click', async () => {
         const finalPassword = document.getElementById('editor-password').value;
         
-        // Отправляем обычный пароль на сервер
         const createResponse = await fetch('/api/admin/editors', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             username: application.username,
-            password: finalPassword, // Здесь обычный пароль
+            password: finalPassword,
             email: application.email,
             telegramId: application.telegram_chat_id
           })
@@ -973,7 +1122,6 @@ window.openCreateEditorFromApplicationModal = async (id) => {
         const createData = await createResponse.json();
         
         if (createResponse.ok) {
-          // Одобряем заявку
           await fetch(`/api/admin/applications/${id}/approve`, { method: 'POST' });
           
           NotificationManager.show(
@@ -1001,7 +1149,6 @@ window.openCreateEditorFromApplicationModal = async (id) => {
 
 // Отклонение заявки с красивым подтверждением
 window.rejectApplication = async (id) => {
-  // Создаём модальное окно подтверждения
   const confirmContent = `
     <div style="text-align: center; padding: 20px;">
       <div style="font-size: 48px; margin-bottom: 20px;">❌</div>
@@ -1020,7 +1167,6 @@ window.rejectApplication = async (id) => {
     width: '400px'
   });
   
-  // Обработчик для кнопки "Да, отклонить"
   document.getElementById('confirm-reject-yes').addEventListener('click', async () => {
     confirmModal.close();
     
@@ -1041,7 +1187,6 @@ window.rejectApplication = async (id) => {
     }
   });
   
-  // Обработчик для кнопки "Нет, отмена"
   document.getElementById('confirm-reject-no').addEventListener('click', () => {
     confirmModal.close();
   });
@@ -1106,31 +1251,8 @@ window.rejectExhibit = async (id) => {
   }
 };
 
-// Удаление редактора
-window.deleteEditor = async (id) => {
-  if (!confirm('Вы уверены, что хотите удалить этого редактора?')) return;
-  
-  try {
-    const response = await fetch(`/api/admin/editors/${id}`, {
-      method: 'DELETE'
-    });
-    
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Ошибка удаления');
-    }
-    
-    NotificationManager.show('Редактор удален', 'success');
-    await loadEditorsList(); // Перезагружаем список
-    
-  } catch (error) {
-    NotificationManager.show(error.message, 'error');
-  }
-};
-
 // Выход из системы
 async function logout() {
-  // Подтверждение выхода
   const confirmContent = `
     <div style="text-align: center; padding: 20px;">
       <div style="font-size: 48px; margin-bottom: 20px;">👋</div>

@@ -453,6 +453,42 @@ body {
     font-size: 1.2rem;
 }
 
+/* ===== СТИЛИ ДЛЯ ВЫПАДАЮЩИХ СПИСКОВ ===== */
+.admin-select {
+    width: 100%;
+    padding: 12px 15px;
+    background: #1e293b;
+    border: 1px solid #4ecdc4;
+    border-radius: 8px;
+    color: white;
+    font-size: 1rem;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%234ecdc4' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 15px center;
+    background-size: 16px;
+}
+
+.admin-select:hover {
+    border-color: #ffe66d;
+    box-shadow: 0 0 10px rgba(78, 205, 196, 0.3);
+}
+
+.admin-select:focus {
+    outline: none;
+    border-color: #4ecdc4;
+    box-shadow: 0 0 15px #4ecdc4;
+}
+
+.admin-select option {
+    background: #1e293b;
+    color: white;
+    padding: 10px;
+}
+
 /* ===== МОДАЛЬНЫЕ ОКНА ===== */
 .modal-overlay {
     position: fixed;

@@ -412,11 +412,14 @@ app.post('/api/admin/reject/:id', authenticateToken, isAdmin, (req, res) => {
 
 // ============= РЕДАКТОРЫ =============
 app.get('/api/admin/editors', authenticateToken, isAdmin, (req, res) => {
+    console.log('📋 Запрос списка редакторов');
+    
     db.all(`SELECT id, username, email, created_at FROM users WHERE role = 'editor'`, [], (err, rows) => {
         if (err) {
-            console.error('❌ Ошибка:', err);
+            console.error('❌ Ошибка получения редакторов:', err);
             return res.status(500).json({ error: err.message });
         }
+        console.log(`✅ Найдено редакторов: ${rows?.length || 0}`);
         res.json(rows || []);
     });
 });
@@ -443,6 +446,7 @@ app.post('/api/admin/editors', authenticateToken, isAdmin, async (req, res) => {
     const salt = bcrypt.genSaltSync(10);
     const hash = bcrypt.hashSync(password, salt);
     
+    // Сначала создаем редактора в БД
     db.run(
         `INSERT INTO users (username, password, email, role) VALUES (?, ?, ?, 'editor')`,
         [username, hash, email || null],
@@ -455,33 +459,87 @@ app.post('/api/admin/editors', authenticateToken, isAdmin, async (req, res) => {
                 return res.status(500).json({ error: err.message });
             }
             
-            console.log(`✅ Редактор создан с ID: ${this.lastID}`);
+            const editorId = this.lastID;
+            console.log(`✅ Редактор создан с ID: ${editorId}`);
             
             let telegramSent = false;
-            // Отправляем данные в Telegram только если указан ID
+            // Отправляем данные в Telegram только если указан ID и бот инициализирован
             if (telegramId && telegramId.trim() !== '') {
                 try {
+                    // Пытаемся отправить, но не блокируем ответ, если не получилось
                     const { sendCredentialsToUser } = require('./telegramBot');
-                    await sendCredentialsToUser(telegramId, username, password);
-                    telegramSent = true;
-                    console.log(`✅ Данные отправлены в Telegram: ${telegramId}`);
+                    const sent = await sendCredentialsToUser(telegramId, username, password);
+                    telegramSent = sent;
+                    if (sent) {
+                        console.log(`✅ Данные отправлены в Telegram: ${telegramId}`);
+                    } else {
+                        console.log(`⚠️ Не удалось отправить в Telegram: ${telegramId}`);
+                    }
                 } catch (e) {
                     console.error('❌ Ошибка отправки в Telegram:', e.message);
+                    // Не блокируем создание редактора
                 }
-            } else {
-                console.log('ℹ️ Telegram ID не указан, пропускаем отправку');
             }
             
-            // Возвращаем созданного редактора вместе с паролем (для отображения админу)
+            // Возвращаем данные редактора вместе с паролем
             res.json({ 
-                id: this.lastID,
+                id: editorId,
                 username,
                 email: email || null,
-                password: password, // Отправляем оригинальный пароль обратно
+                password: password, // Отправляем оригинальный пароль для отображения
+                telegramSent,
                 message: telegramSent 
                     ? 'Редактор создан. Данные отправлены в Telegram.' 
-                    : 'Редактор создан.',
-                telegramSent
+                    : 'Редактор создан.'
+            });
+        }
+    );
+});
+
+// Новый маршрут для обновления редактора
+app.put('/api/admin/editors/:id', authenticateToken, isAdmin, (req, res) => {
+    const editorId = req.params.id;
+    const { username, email, password } = req.body;
+    
+    // Строим запрос динамически
+    let updates = [];
+    let params = [];
+    
+    if (username) {
+        updates.push('username = ?');
+        params.push(username);
+    }
+    if (email !== undefined) {
+        updates.push('email = ?');
+        params.push(email || null);
+    }
+    if (password) {
+        const salt = bcrypt.genSaltSync(10);
+        const hash = bcrypt.hashSync(password, salt);
+        updates.push('password = ?');
+        params.push(hash);
+    }
+    
+    if (updates.length === 0) {
+        return res.status(400).json({ error: 'Нет данных для обновления' });
+    }
+    
+    params.push(editorId);
+    
+    db.run(
+        `UPDATE users SET ${updates.join(', ')} WHERE id = ? AND role = 'editor'`,
+        params,
+        function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            if (this.changes === 0) return res.status(404).json({ error: 'Редактор не найден' });
+            
+            // Возвращаем обновленные данные
+            db.get(`SELECT id, username, email, created_at FROM users WHERE id = ?`, [editorId], (err, editor) => {
+                if (err) return res.status(500).json({ error: err.message });
+                res.json({ 
+                    message: 'Редактор обновлен',
+                    editor: editor
+                });
             });
         }
     );
