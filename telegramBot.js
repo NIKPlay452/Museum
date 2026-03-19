@@ -2,24 +2,28 @@ const TelegramBot = require('node-telegram-bot-api');
 const db = require('./database');
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
-
-if (!token) {
-    console.error('❌ TELEGRAM_BOT_TOKEN не задан! Бот не запустится.');
-} else {
-    // Инициализация бота с токеном
-    bot = new TelegramBot(token, { polling: true });
-}
 const ADMIN_CHAT_ID = 5231666805;
 const SITE_URL = process.env.SITE_URL || 'https://museum-six-umber.vercel.app';
 
+if (!token) {
+    console.error('❌ TELEGRAM_BOT_TOKEN не задан! Бот не запустится.');
+    process.exit(1);
+}
+
 let bot = null;
-const userStates = {};
+const userStates = new Map(); // Используем Map вместо объекта для производительности
 
 function initBot() {
     try {
         console.log('🤖 Запуск Telegram бота...');
         
-        bot = new TelegramBot(token, { polling: true });
+        bot = new TelegramBot(token, { 
+            polling: true,
+            polling: { 
+                params: { timeout: 10 },
+                interval: 300 // Уменьшаем интервал опроса
+            }
+        });
         
         console.log('✅ Telegram бот запущен');
         
@@ -28,7 +32,7 @@ function initBot() {
             const chatId = msg.chat.id;
             const userName = msg.from.first_name || 'Пользователь';
             
-            userStates[chatId] = { step: 'name' };
+            userStates.set(chatId, { step: 'name' });
             
             bot.sendMessage(
                 chatId, 
@@ -36,7 +40,8 @@ function initBot() {
                 {
                     reply_markup: {
                         keyboard: [['❌ Отменить']],
-                        resize_keyboard: true
+                        resize_keyboard: true,
+                        one_time_keyboard: true
                     }
                 }
             );
@@ -90,7 +95,7 @@ function initBot() {
         // Команда /cancel
         bot.onText(/\/cancel/, (msg) => {
             const chatId = msg.chat.id;
-            delete userStates[chatId];
+            userStates.delete(chatId);
             bot.sendMessage(chatId, '❌ Отменено', { reply_markup: { remove_keyboard: true } });
         });
         
@@ -101,14 +106,14 @@ function initBot() {
             
             if (!text || text.startsWith('/')) return;
             
-            const state = userStates[chatId];
+            const state = userStates.get(chatId);
             if (!state) {
                 bot.sendMessage(chatId, 'Отправьте /start');
                 return;
             }
             
             if (text === '❌ Отменить') {
-                delete userStates[chatId];
+                userStates.delete(chatId);
                 bot.sendMessage(chatId, '❌ Отменено', { reply_markup: { remove_keyboard: true } });
                 return;
             }
@@ -120,7 +125,7 @@ function initBot() {
                             bot.sendMessage(chatId, '❌ Слишком короткое имя');
                             return;
                         }
-                        userStates[chatId] = { ...state, step: 'username', fullName: text };
+                        userStates.set(chatId, { ...state, step: 'username', fullName: text });
                         bot.sendMessage(chatId, '✅ Введите логин (латиница):');
                         break;
                         
@@ -139,7 +144,7 @@ function initBot() {
                             return;
                         }
                         
-                        userStates[chatId] = { ...state, step: 'email', username: text };
+                        userStates.set(chatId, { ...state, step: 'email', username: text });
                         bot.sendMessage(chatId, '✅ Введите email:');
                         break;
                         
@@ -149,7 +154,7 @@ function initBot() {
                             return;
                         }
                         
-                        userStates[chatId] = { ...state, step: 'reason', email: text };
+                        userStates.set(chatId, { ...state, step: 'reason', email: text });
                         bot.sendMessage(chatId, '✅ Почему хотите стать редактором?');
                         break;
                         
@@ -180,7 +185,7 @@ function initBot() {
                             }
                         );
                         
-                        delete userStates[chatId];
+                        userStates.delete(chatId);
                         break;
                 }
             } catch (e) {

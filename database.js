@@ -11,9 +11,7 @@ console.log(`📁 Используется БД: ${dbPath} (${isVercel ? 'Vercel
 
 if (!isVercel) {
     const dbDir = path.dirname(dbPath);
-    if (!fs.existsSync(dbDir)) {
-        fs.mkdirSync(dbDir, { recursive: true });
-    }
+    if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
 }
 
 const db = new sqlite3.Database(dbPath, (err) => {
@@ -24,6 +22,12 @@ const db = new sqlite3.Database(dbPath, (err) => {
         initTables();
     }
 });
+
+// Включаем WAL режим для производительности
+db.exec('PRAGMA journal_mode = WAL;');
+db.exec('PRAGMA synchronous = NORMAL;');
+db.exec('PRAGMA cache_size = 10000;');
+db.exec('PRAGMA temp_store = MEMORY;');
 
 function initTables() {
     db.serialize(() => {
@@ -38,25 +42,19 @@ function initTables() {
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )`, (err) => {
             if (err) {
-                console.error('❌ Ошибка создания таблицы users:', err);
+                console.error('❌ Ошибка создания users:', err);
             } else {
-                console.log('✅ Таблица users создана/проверена');
+                console.log('✅ Таблица users создана');
                 
-                // Проверяем и добавляем колонку email, если её нет
-                db.all("PRAGMA table_info(users)", (err, columns) => {
-                    if (err) {
-                        console.error('❌ Ошибка при проверке структуры:', err);
-                        return;
-                    }
-                    
-                    const hasEmail = columns.some(col => col.name === 'email');
-                    if (!hasEmail) {
-                        db.run(`ALTER TABLE users ADD COLUMN email TEXT`, (err) => {
-                            if (err) {
-                                console.error('❌ Ошибка при добавлении email:', err);
-                            } else {
-                                console.log('✅ Колонка email добавлена в таблицу users');
-                            }
+                // Добавляем индексы
+                db.run('CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)');
+                db.run('CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)');
+                
+                // Проверяем и добавляем email
+                db.all("PRAGMA table_info(users)", (err, cols) => {
+                    if (!err && !cols.some(c => c.name === 'email')) {
+                        db.run('ALTER TABLE users ADD COLUMN email TEXT', (e) => {
+                            if (!e) console.log('✅ Добавлен email');
                         });
                     }
                 });
@@ -71,15 +69,24 @@ function initTables() {
             description TEXT NOT NULL,
             media_path TEXT,
             background_path TEXT,
-            status TEXT CHECK(status IN ('pending_creation', 'pending_edit', 'approved', 'rejected')) DEFAULT 'pending_creation',
+            status TEXT DEFAULT 'pending_creation' CHECK(status IN ('pending_creation', 'pending_edit', 'approved', 'rejected')),
             created_by INTEGER,
             original_id INTEGER,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (created_by) REFERENCES users(id),
             FOREIGN KEY (original_id) REFERENCES exhibits(id)
         )`, (err) => {
-            if (err) console.error('❌ Ошибка создания таблицы exhibits:', err);
-            else console.log('✅ Таблица exhibits создана/проверена');
+            if (err) {
+                console.error('❌ Ошибка создания exhibits:', err);
+            } else {
+                console.log('✅ Таблица exhibits создана');
+                
+                // Индексы для быстрого поиска
+                db.run('CREATE INDEX IF NOT EXISTS idx_exhibits_status ON exhibits(status)');
+                db.run('CREATE INDEX IF NOT EXISTS idx_exhibits_year ON exhibits(year)');
+                db.run('CREATE INDEX IF NOT EXISTS idx_exhibits_created_by ON exhibits(created_by)');
+                db.run('CREATE INDEX IF NOT EXISTS idx_exhibits_original ON exhibits(original_id)');
+            }
         });
 
         // Таблица заявок
@@ -93,11 +100,17 @@ function initTables() {
             status TEXT DEFAULT 'pending',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )`, (err) => {
-            if (err) console.error('❌ Ошибка создания таблицы applications:', err);
-            else console.log('✅ Таблица applications создана/проверена');
+            if (err) {
+                console.error('❌ Ошибка создания applications:', err);
+            } else {
+                console.log('✅ Таблица applications создана');
+                
+                db.run('CREATE INDEX IF NOT EXISTS idx_applications_status ON applications(status)');
+                db.run('CREATE INDEX IF NOT EXISTS idx_applications_telegram ON applications(telegram_chat_id)');
+            }
         });
 
-        console.log('✅ Все таблицы созданы/проверены.');
+        console.log('✅ Все таблицы созданы');
         createDefaultAdmin();
     });
 }
@@ -105,7 +118,7 @@ function initTables() {
 function createDefaultAdmin() {
     db.get(`SELECT * FROM users WHERE role = 'admin'`, (err, row) => {
         if (err) {
-            console.error('❌ Ошибка при проверке админа:', err);
+            console.error('❌ Ошибка проверки админа:', err);
             return;
         }
         if (!row) {
@@ -119,7 +132,7 @@ function createDefaultAdmin() {
                     if (err) {
                         console.error('❌ Не удалось создать админа:', err);
                     } else {
-                        console.log('✅ Создан пользователь admin с паролем admin123');
+                        console.log('✅ Создан admin с паролем admin123');
                     }
                 }
             );

@@ -3,6 +3,9 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 :root {
@@ -799,50 +802,141 @@ body {
     to { transform: translateX(100%); opacity: 0; }
 }
 
-/* ===== АДАПТАЦИЯ ДЛЯ МАЛЕНЬКИХ ЭКРАНОВ ===== */
-@media (max-width: 480px) {
-    .site-header {
-        padding: 10px 12px;
-    }
-    
-    .home-link {
-        padding: 6px 12px;
-        font-size: 0.9rem;
-    }
-    
-    .btn-login {
-        padding: 6px 15px;
-        font-size: 0.85rem;
-    }
-    
-    .user-badge {
-        display: none; /* Скрываем на очень маленьких экранах */
-    }
-    
-    .admin-buttons {
-        grid-template-columns: 1fr;
-    }
-    
-    .modal-content {
-        padding: 20px 15px;
-    }
-    
-    .timeline-points {
-        min-width: 500px;
-    }
-    
-    .timeline-point .year {
-        font-size: 0.8rem;
-    }
+/* ===== ДОПОЛНИТЕЛЬНЫЕ ОПТИМИЗАЦИИ ===== */
+
+/* Скелетон загрузки */
+@keyframes pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.8; }
 }
 
-/* Для очень маленьких экранов */
-@media (max-width: 360px) {
-    .home-link span {
-        display: none; /* Скрываем текст "Главная", оставляем только иконку */
-    }
-    
-    .timeline-points {
-        min-width: 450px;
-    }
+.skeleton {
+  animation: pulse 1.5s ease-in-out infinite;
+  background: linear-gradient(90deg, #1e293b 25%, #2d3b55 50%, #1e293b 75%);
+  background-size: 200% 100%;
+  border-radius: 4px;
+}
+
+/* Ленивая загрузка изображений */
+img[loading="lazy"] {
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+img[loading="lazy"].loaded {
+  opacity: 1;
+}
+
+/* Адаптация для очень старых телефонов */
+@media (max-width: 320px) {
+  .site-header {
+    padding: 8px 10px;
+  }
+  
+  .home-link {
+    padding: 4px 8px;
+    font-size: 0.8rem;
+  }
+  
+  .btn-login {
+    padding: 4px 10px;
+    font-size: 0.75rem;
+  }
+  
+  .site-title {
+    font-size: 1.2rem;
+    margin: 20px 0;
+  }
+  
+  .timeline-point .year {
+    font-size: 0.7rem;
+  }
+  
+  .admin-buttons {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  
+  .admin-btn {
+    padding: 10px;
+    font-size: 0.9rem;
+  }
+  
+  .modal-content {
+    padding: 15px 10px;
+  }
+  
+  .form-group input,
+  .form-group textarea {
+    padding: 8px 10px;
+    font-size: 0.9rem;
+  }
+}
+
+/* Улучшенная читаемость на малых экранах */
+@media (max-width: 480px) {
+  .exhibit-content {
+    grid-template-columns: 1fr;
+  }
+  
+  .exhibit-media {
+    min-height: 150px;
+  }
+  
+  .exhibit-info h2 {
+    font-size: 1.3rem;
+  }
+  
+  .exhibit-year {
+    font-size: 1rem;
+  }
+  
+  .exhibit-description {
+    font-size: 0.9rem;
+  }
+}
+
+/* Оптимизация для touch-устройств */
+@media (hover: none) {
+  .admin-btn:hover,
+  .btn-login:hover,
+  .home-link:hover {
+    transform: none;
+  }
+  
+  .admin-btn:active,
+  .btn-login:active,
+  .home-link:active {
+    transform: scale(0.98);
+  }
+}
+
+/* Ускорение анимаций */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Оптимизация для печати */
+@media print {
+  .site-header,
+  .telegram-fab,
+  .admin-buttons,
+  .modal-overlay {
+    display: none !important;
+  }
+  
+  .container,
+  .admin-container {
+    margin: 20px auto;
+    padding: 0;
+  }
+  
+  body {
+    background: white;
+    color: black;
+  }
 }
