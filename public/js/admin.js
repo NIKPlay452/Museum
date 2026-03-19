@@ -100,13 +100,15 @@ function generateUniqueId(prefix = 'field') {
 }
 
 // ============================================================================
-// СОЗДАНИЕ ЭКСПОНАТА
+// СОЗДАНИЕ ЭКСПОНАТА (ИСПРАВЛЕННАЯ ВЕРСИЯ)
 // ============================================================================
 
 function openCreateModal() {
     const titleId = generateUniqueId('title');
     const yearId = generateUniqueId('year');
     const descId = generateUniqueId('desc');
+    const mediaContainerId = `media-container-${generateUniqueId()}`;
+    const bgContainerId = `bg-container-${generateUniqueId()}`;
     
     const modalContent = `
         <div class="create-exhibit-form">
@@ -127,11 +129,11 @@ function openCreateModal() {
             <div class="form-right">
                 <div class="form-group">
                     <label>Медиафайл *</label>
-                    <div class="media-upload-container"></div>
+                    <div id="${mediaContainerId}" class="media-upload-container"></div>
                 </div>
                 <div class="form-group">
                     <label>Фон (необязательно)</label>
-                    <div class="background-upload-container"></div>
+                    <div id="${bgContainerId}" class="background-upload-container"></div>
                 </div>
             </div>
             <button class="submit-btn" id="create-exhibit-btn">✨ Создать</button>
@@ -144,9 +146,9 @@ function openCreateModal() {
         width: '900px'
     });
     
-    // Инициализация загрузчиков с уникальными ID
+    // Инициализация загрузчиков после того, как DOM обновился
     setTimeout(() => {
-        initCreateUploaders();
+        initCreateUploaders(mediaContainerId, bgContainerId);
     }, 100);
     
     document.getElementById('create-exhibit-btn').addEventListener('click', async () => {
@@ -193,7 +195,24 @@ function openCreateModal() {
     });
 }
 
-function initCreateUploaders() {
+// ============================================================================
+// ИНИЦИАЛИЗАЦИЯ ЗАГРУЗЧИКОВ (ИСПРАВЛЕННАЯ ВЕРСИЯ)
+// ============================================================================
+
+function initCreateUploaders(mediaContainerId, bgContainerId) {
+    // Убеждаемся, что контейнеры существуют
+    const mediaContainer = document.getElementById(mediaContainerId);
+    const bgContainer = document.getElementById(bgContainerId);
+    
+    if (!mediaContainer || !bgContainer) {
+        console.error('Контейнеры для загрузки не найдены');
+        return;
+    }
+    
+    // Очищаем контейнеры
+    mediaContainer.innerHTML = '';
+    bgContainer.innerHTML = '';
+    
     const mediaUploader = new FileUploader({
         onUpload: (file) => console.log('Медиа:', file.name)
     });
@@ -203,54 +222,100 @@ function initCreateUploaders() {
         accept: 'image/*'
     });
     
-    mediaUploader.createUploadArea('media-upload-container', 'media');
-    bgUploader.createUploadArea('background-upload-container', 'background');
+    // Создаем области загрузки
+    mediaUploader.createUploadArea(mediaContainerId, 'media');
+    bgUploader.createUploadArea(bgContainerId, 'background');
 }
 
 // ============================================================================
-// РЕДАКТИРОВАНИЕ ЭКСПОНАТА
+// ИНИЦИАЛИЗАЦИЯ ЗАГРУЗЧИКОВ ДЛЯ РЕДАКТИРОВАНИЯ
 // ============================================================================
 
-async function openEditModal() {
-    let modalContent = '';
+function initEditUploaders(mediaContainerId, bgContainerId) {
+    const mediaContainer = document.getElementById(mediaContainerId);
+    const bgContainer = document.getElementById(bgContainerId);
     
-    if (currentUser.role === 'admin') {
-        modalContent = `
-            <div style="display: flex; gap: 10px; margin-bottom: 20px;">
-                <select id="edit-mode-select" class="admin-select">
-                    <option value="edit">✏️ Редактировать</option>
-                    <option value="pending">⏳ На проверке</option>
-                    <option value="pending-edits">🔄 Изменения</option>
-                </select>
-            </div>
-            <div id="edit-mode-content"></div>
-        `;
-    } else {
-        modalContent = `
-            <div class="form-group">
-                <label for="exhibit-select">Выберите экспонат:</label>
-                <select id="exhibit-select" class="admin-select">
-                    <option value="">-- Выберите --</option>
-                    ${exhibits.filter(e => e.status === 'approved').map(e => 
-                        `<option value="${e.id}">${e.title} (${e.year})</option>`
-                    ).join('')}
-                </select>
-            </div>
-            <div id="edit-form-container"></div>
-        `;
+    if (!mediaContainer || !bgContainer) {
+        console.error('Контейнеры для редактирования не найдены');
+        return;
     }
     
-    const modal = createModal({
-        title: '✏️ Редактирование',
-        content: modalContent,
-        width: '1000px'
-    });
+    mediaContainer.innerHTML = '';
+    bgContainer.innerHTML = '';
     
-    if (currentUser.role === 'admin') {
-        setupAdminEditModes(modal);
-    } else {
-        setupEditorEditMode(modal);
+    const mediaUploader = new FileUploader({});
+    const bgUploader = new FileUploader({ accept: 'image/*' });
+    
+    mediaUploader.createUploadArea(mediaContainerId, 'media');
+    bgUploader.createUploadArea(bgContainerId, 'background');
+}
+
+// ============================================================================
+// ЗАГРУЗКА ЭКСПОНАТА ДЛЯ РЕДАКТИРОВАНИЯ
+// ============================================================================
+
+async function loadExhibitForEdit(exhibitId, containerId) {
+    try {
+        const response = await fetch(`/api/exhibits/${exhibitId}`);
+        const exhibit = await response.json();
+        
+        const container = document.getElementById(containerId);
+        const titleId = generateUniqueId('edit-title');
+        const yearId = generateUniqueId('edit-year');
+        const descId = generateUniqueId('edit-desc');
+        const mediaContainerId = `edit-media-${generateUniqueId()}`;
+        const bgContainerId = `edit-bg-${generateUniqueId()}`;
+        
+        container.innerHTML = getEditFormHTML(exhibit, titleId, yearId, descId, mediaContainerId, bgContainerId);
+        
+        setTimeout(() => {
+            initEditUploaders(mediaContainerId, bgContainerId);
+        }, 100);
+        
+        setupEditHandlers(exhibitId, exhibit);
+        
+    } catch (error) {
+        NotificationManager.show('Ошибка загрузки', 'error');
     }
+}
+
+function getEditFormHTML(exhibit, titleId, yearId, descId, mediaContainerId, bgContainerId) {
+    return `
+        <div class="create-exhibit-form">
+            <div class="form-left">
+                <div class="form-group">
+                    <label for="${titleId}">Название *</label>
+                    <input type="text" id="${titleId}" class="edit-title" value="${exhibit.title.replace(/"/g, '&quot;')}" required>
+                </div>
+                <div class="form-group">
+                    <label for="${yearId}">Год *</label>
+                    <input type="number" id="${yearId}" class="edit-year" value="${exhibit.year}" required>
+                </div>
+                <div class="form-group">
+                    <label for="${descId}">Описание *</label>
+                    <textarea id="${descId}" class="edit-description" required>${exhibit.description.replace(/"/g, '&quot;')}</textarea>
+                </div>
+            </div>
+            <div class="form-right">
+                <div class="form-group">
+                    <label>Медиафайл</label>
+                    <div id="${mediaContainerId}" class="edit-media-container"></div>
+                    ${exhibit.media_path ? `<p>Текущий: ${exhibit.media_path.split('/').pop()}</p>` : ''}
+                </div>
+                <div class="form-group">
+                    <label>Фон</label>
+                    <div id="${bgContainerId}" class="edit-background-container"></div>
+                    ${exhibit.background_path ? `<p>Текущий: ${exhibit.background_path.split('/').pop()}</p>` : ''}
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                ${currentUser.role === 'admin' ? `
+                    <button class="submit-btn" id="delete-exhibit-btn" style="background: #ff6b6b; flex: 1;">🗑️ Удалить</button>
+                ` : ''}
+                <button class="submit-btn" id="update-exhibit-btn" style="flex: 2;">💾 Сохранить</button>
+            </div>
+        </div>
+    `;
 }
 
 function setupAdminEditModes(modal) {
