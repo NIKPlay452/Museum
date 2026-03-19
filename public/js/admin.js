@@ -1169,7 +1169,7 @@ window.rejectExhibit = async (id) => {
 };
 
 // ============================================================================
-// ВЫХОД
+// ВЫХОД (ИСПРАВЛЕННАЯ ВЕРСИЯ)
 // ============================================================================
 
 async function logout() {
@@ -1193,15 +1193,36 @@ async function logout() {
     document.getElementById('confirm-logout-yes').addEventListener('click', async () => {
         confirmModal.close();
         
-        await fetch('/api/logout', { method: 'POST', credentials: 'include' });
-        NotificationManager.show('Выход выполнен', 'info');
-        
-        window.dispatchEvent(new Event('authChange'));
-        clearCache();
-        
-        setTimeout(() => {
-            window.location.href = '/views/index.html';
-        }, 500);
+        try {
+            await fetch('/api/logout', { 
+                method: 'POST', 
+                credentials: 'include' 
+            });
+            
+            NotificationManager.show('Выход выполнен', 'info');
+            
+            // Очищаем кэш
+            if (window.clearCache) {
+                window.clearCache();
+            }
+            
+            // Обновляем UI на всех страницах
+            window.dispatchEvent(new Event('authChange'));
+            
+            // Принудительно обновляем кнопку на главной
+            if (window.updateAuthUI) {
+                window.updateAuthUI();
+            }
+            
+            // Перенаправляем на главную
+            setTimeout(() => {
+                window.location.href = '/views/index.html';
+            }, 500);
+            
+        } catch (error) {
+            console.error('Ошибка при выходе:', error);
+            NotificationManager.show('Ошибка при выходе', 'error');
+        }
     });
     
     document.getElementById('confirm-logout-no').addEventListener('click', () => confirmModal.close());

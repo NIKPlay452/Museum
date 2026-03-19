@@ -270,15 +270,19 @@ async function fetchWithCache(url, cacheKey, forceRefresh = false) {
     }
 }
 
-// Очистка кэша
-function clearCache(key) {
-    if (key) {
+// Очистка кэша (ИСПРАВЛЕННАЯ ВЕРСИЯ)
+function clearCache(key = null) {
+    if (key && AppCache.hasOwnProperty(key)) {
         AppCache[key] = null;
-        AppCache.lastFetch[key] = 0;
-    } else {
-        Object.keys(AppCache).forEach(k => {
-            if (k !== 'user') {
-                AppCache[k] = null;
+        if (AppCache.lastFetch && AppCache.lastFetch.hasOwnProperty(key)) {
+            AppCache.lastFetch[key] = 0;
+        }
+    } else if (key === null) {
+        // Очищаем все кэши, кроме user
+        const cacheKeys = ['exhibits', 'editors', 'applications'];
+        cacheKeys.forEach(k => {
+            AppCache[k] = null;
+            if (AppCache.lastFetch && AppCache.lastFetch.hasOwnProperty(k)) {
                 AppCache.lastFetch[k] = 0;
             }
         });
