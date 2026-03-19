@@ -10,59 +10,81 @@ const db = require('./database');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Секретный ключ для JWT
-const JWT_SECRET = process.env.JWT_SECRET || 'museum-secret-key-2026';
+// ============================================================================
+// КОНФИГУРАЦИЯ
+// ============================================================================
 
-// Инициализация ImageKit
+const JWT_SECRET = process.env.JWT_SECRET || 'museum-secret-key-2026';
+const CACHE_DURATION = 5 * 60 * 1000; // 5 минут
+
+// ImageKit
 const imagekit = new ImageKit({
     publicKey: process.env.IMAGEKIT_PUBLIC_KEY,
     privateKey: process.env.IMAGEKIT_PRIVATE_KEY,
     urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT
 });
 
-// Временное хранилище паролей редакторов (в памяти)
+// Временное хранилище паролей (24 часа)
 const tempPasswords = new Map();
+setInterval(() => {
+    const now = Date.now();
+    for (const [id, { password, expires }] of tempPasswords.entries()) {
+        if (expires < now) tempPasswords.delete(id);
+    }
+}, 60 * 60 * 1000); // Проверка каждый час
 
-// Настройка multer для временного хранения в памяти
+// Multer
 const storage = multer.memoryStorage();
 const upload = multer({ 
-    storage: storage,
-    limits: { fileSize: 10 * 1024 * 1024 } // 10MB лимит
+    storage,
+    limits: { fileSize: 10 * 1024 * 1024 } // 10MB
 });
 
-// ========== ЛОГИРОВАНИЕ ==========
+// ============================================================================
+// MIDDLEWARE
+// ============================================================================
+
 app.use((req, res, next) => {
     console.log(`📨 ${req.method} ${req.url}`);
     next();
 });
 
-// ========== MIDDLEWARE ==========
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// ========== СТАТИЧЕСКИЕ ФАЙЛЫ ==========
+// Статические файлы с кэшированием
+const staticOptions = {
+    maxAge: '1d',
+    immutable: true
+};
+
 app.use('/css', express.static(path.join(__dirname, 'public', 'css'), {
+    ...staticOptions,
     setHeaders: (res, filePath) => {
         if (filePath.endsWith('.css')) res.setHeader('Content-Type', 'text/css');
     }
 }));
 
 app.use('/js', express.static(path.join(__dirname, 'public', 'js'), {
+    ...staticOptions,
     setHeaders: (res, filePath) => {
         if (filePath.endsWith('.js')) res.setHeader('Content-Type', 'application/javascript');
     }
 }));
 
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-app.use('/views', express.static(path.join(__dirname, 'views')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), staticOptions));
+app.use('/views', express.static(path.join(__dirname, 'views'), staticOptions));
 
 // Корневой маршрут
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'views', 'index.html'));
 });
 
-// ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
+// ============================================================================
+// ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+// ============================================================================
+
 const authenticateToken = (req, res, next) => {
     const token = req.cookies.token || req.headers['authorization']?.split(' ')[1];
     if (!token) return res.status(401).json({ error: 'Не авторизован' });
@@ -75,30 +97,23 @@ const authenticateToken = (req, res, next) => {
 };
 
 const isAdmin = (req, res, next) => {
-    if (req.user && req.user.role === 'admin') next();
+    if (req.user?.role === 'admin') next();
     else res.status(403).json({ error: 'Доступ запрещен' });
 };
 
-// ============= АВТОРИЗАЦИЯ =============
+// ============================================================================
+// АВТОРИЗАЦИЯ
+// ============================================================================
+
 app.post('/api/login', (req, res) => {
     const { username, password } = req.body;
-    console.log(`🔐 Попытка входа: ${username}`);
     
     db.get(`SELECT * FROM users WHERE username = ?`, [username], (err, user) => {
-        if (err) {
-            console.error('❌ Ошибка БД:', err);
-            return res.status(500).json({ error: 'Ошибка сервера' });
-        }
-        if (!user) {
-            console.log('❌ Пользователь не найден');
-            return res.status(401).json({ error: 'Неверный логин или пароль' });
-        }
+        if (err) return res.status(500).json({ error: 'Ошибка сервера' });
+        if (!user) return res.status(401).json({ error: 'Неверный логин или пароль' });
         
         bcrypt.compare(password, user.password, (err, isValid) => {
-            if (err || !isValid) {
-                console.log('❌ Неверный пароль');
-                return res.status(401).json({ error: 'Неверный логин или пароль' });
-            }
+            if (err || !isValid) return res.status(401).json({ error: 'Неверный логин или пароль' });
             
             const token = jwt.sign(
                 { id: user.id, username: user.username, role: user.role },
@@ -127,7 +142,10 @@ app.get('/api/me', authenticateToken, (req, res) => {
     res.json({ user: req.user });
 });
 
-// ============= ЭКСПОНАТЫ =============
+// ============================================================================
+// ЭКСПОНАТЫ
+// ============================================================================
+
 app.get('/api/exhibits', (req, res) => {
     db.all(`SELECT * FROM exhibits WHERE status = 'approved' ORDER BY year ASC`, [], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -181,13 +199,13 @@ app.post('/api/exhibits', authenticateToken, upload.fields([
         return res.status(400).json({ error: 'Заполните все поля' });
     }
     
-    // Проверка на дубликат
-    const checkDuplicate = await new Promise((resolve) => {
+    // Проверка дубликата
+    const existing = await new Promise(resolve => 
         db.get(`SELECT id FROM exhibits WHERE title = ? AND year = ? AND description = ?`, 
-            [title, year, description], (err, row) => resolve(row));
-    });
+            [title, year, description], (err, row) => resolve(row))
+    );
     
-    if (checkDuplicate) {
+    if (existing) {
         return res.status(400).json({ error: 'Экспонат уже существует' });
     }
     
@@ -195,7 +213,7 @@ app.post('/api/exhibits', authenticateToken, upload.fields([
         let mediaUrl = null;
         let backgroundUrl = null;
         
-        if (req.files?.media && req.files.media[0]) {
+        if (req.files?.media?.[0]) {
             const file = req.files.media[0];
             const result = await imagekit.upload({
                 file: file.buffer,
@@ -206,7 +224,7 @@ app.post('/api/exhibits', authenticateToken, upload.fields([
             mediaUrl = result.url;
         }
         
-        if (req.files?.background && req.files.background[0]) {
+        if (req.files?.background?.[0]) {
             const file = req.files.background[0];
             const result = await imagekit.upload({
                 file: file.buffer,
@@ -227,14 +245,14 @@ app.post('/api/exhibits', authenticateToken, upload.fields([
                 if (err) return res.status(500).json({ error: err.message });
                 res.json({ 
                     id: this.lastID, 
-                    status: status,
-                    message: status === 'approved' ? 'Экспонат создан' : 'Экспонат отправлен на проверку'
+                    status,
+                    message: status === 'approved' ? 'Экспонат создан' : 'Отправлен на проверку'
                 });
             }
         );
     } catch (error) {
-        console.error('❌ Ошибка загрузки в ImageKit:', error);
-        res.status(500).json({ error: 'Ошибка при загрузке файла' });
+        console.error('❌ Ошибка ImageKit:', error);
+        res.status(500).json({ error: 'Ошибка загрузки файла' });
     }
 });
 
@@ -253,7 +271,7 @@ app.put('/api/exhibits/:id', authenticateToken, upload.fields([
         let backgroundUrl = oldExhibit.background_path;
         
         try {
-            if (req.files?.media && req.files.media[0]) {
+            if (req.files?.media?.[0]) {
                 const file = req.files.media[0];
                 const result = await imagekit.upload({
                     file: file.buffer,
@@ -264,7 +282,7 @@ app.put('/api/exhibits/:id', authenticateToken, upload.fields([
                 mediaUrl = result.url;
             }
             
-            if (req.files?.background && req.files.background[0]) {
+            if (req.files?.background?.[0]) {
                 const file = req.files.background[0];
                 const result = await imagekit.upload({
                     file: file.buffer,
@@ -296,8 +314,8 @@ app.put('/api/exhibits/:id', authenticateToken, upload.fields([
                 );
             }
         } catch (error) {
-            console.error('❌ Ошибка загрузки в ImageKit:', error);
-            res.status(500).json({ error: 'Ошибка при загрузке файла' });
+            console.error('❌ Ошибка ImageKit:', error);
+            res.status(500).json({ error: 'Ошибка загрузки файла' });
         }
     });
 });
@@ -311,7 +329,7 @@ app.delete('/api/admin/exhibits/:id', authenticateToken, isAdmin, (req, res) => 
         
         db.run(`DELETE FROM exhibits WHERE id = ?`, [exhibitId], function(err) {
             if (err) return res.status(500).json({ error: err.message });
-            res.json({ message: 'Экспонат успешно удален' });
+            res.json({ message: 'Экспонат удален' });
         });
     });
 });
@@ -333,7 +351,10 @@ app.post('/api/exhibits/check-duplicate', authenticateToken, (req, res) => {
     });
 });
 
-// ============= АДМИН: ПРОВЕРКА ЭКСПОНАТОВ =============
+// ============================================================================
+// АДМИН: ПРОВЕРКА ЭКСПОНАТОВ
+// ============================================================================
+
 app.get('/api/admin/pending-creations', authenticateToken, isAdmin, (req, res) => {
     db.all(`SELECT e.*, u.username as creator_name FROM exhibits e 
             LEFT JOIN users u ON e.created_by = u.id 
@@ -391,39 +412,31 @@ app.post('/api/admin/reject/:id', authenticateToken, isAdmin, (req, res) => {
     });
 });
 
-// ============= РЕДАКТОРЫ (С ВРЕМЕННЫМ ХРАНЕНИЕМ ПАРОЛЕЙ) =============
+// ============================================================================
+// РЕДАКТОРЫ (С ВРЕМЕННЫМ ХРАНЕНИЕМ ПАРОЛЕЙ)
+// ============================================================================
+
 app.get('/api/admin/editors', authenticateToken, isAdmin, (req, res) => {
-    console.log('📋 Запрос списка редакторов');
-    
     db.all(`SELECT id, username, email, created_at FROM users WHERE role = 'editor'`, [], (err, rows) => {
-        if (err) {
-            console.error('❌ Ошибка получения редакторов:', err);
-            return res.status(500).json({ error: err.message });
-        }
+        if (err) return res.status(500).json({ error: err.message });
         
-        // Добавляем пароли из временного хранилища
         const editorsWithPasswords = rows.map(editor => ({
             ...editor,
-            password: tempPasswords.get(editor.id) || null
+            password: tempPasswords.get(editor.id)?.password || null
         }));
         
-        console.log(`✅ Найдено редакторов: ${editorsWithPasswords.length}`);
         res.json(editorsWithPasswords);
     });
 });
 
 app.get('/api/admin/editors/:id/password', authenticateToken, isAdmin, (req, res) => {
     const editorId = parseInt(req.params.id);
+    const entry = tempPasswords.get(editorId);
     
-    const password = tempPasswords.get(editorId);
-    
-    if (password) {
-        res.json({ password });
+    if (entry) {
+        res.json({ password: entry.password });
     } else {
-        res.json({ 
-            message: 'Пароль больше не доступен (истекло время хранения)',
-            hint: 'Вы можете сбросить пароль через редактирование'
-        });
+        res.json({ message: 'Пароль истек' });
     }
 });
 
@@ -434,9 +447,6 @@ app.post('/api/admin/editors', authenticateToken, isAdmin, async (req, res) => {
         return res.status(400).json({ error: 'Логин и пароль обязательны' });
     }
     
-    console.log(`👤 Создание редактора: ${username} с паролем: ${password}`);
-    
-    // Хэшируем пароль для БД
     const salt = bcrypt.genSaltSync(10);
     const hash = bcrypt.hashSync(password, salt);
     
@@ -445,7 +455,6 @@ app.post('/api/admin/editors', authenticateToken, isAdmin, async (req, res) => {
         [username, hash, email || null],
         async function(err) {
             if (err) {
-                console.error('❌ Ошибка создания редактора:', err);
                 if (err.message.includes('UNIQUE')) {
                     return res.status(400).json({ error: 'Имя пользователя уже занято' });
                 }
@@ -453,26 +462,21 @@ app.post('/api/admin/editors', authenticateToken, isAdmin, async (req, res) => {
             }
             
             const editorId = this.lastID;
-            console.log(`✅ Редактор создан с ID: ${editorId}`);
             
-            // Сохраняем обычный пароль во временном хранилище (на 24 часа)
-            tempPasswords.set(editorId, password);
-            
-            // Автоматически удаляем через 24 часа
-            setTimeout(() => {
-                tempPasswords.delete(editorId);
-                console.log(`🕐 Пароль для редактора ${editorId} удален из временного хранилища`);
-            }, 24 * 60 * 60 * 1000);
+            // Сохраняем пароль на 24 часа
+            tempPasswords.set(editorId, {
+                password,
+                expires: Date.now() + 24 * 60 * 60 * 1000
+            });
             
             let telegramSent = false;
-            if (telegramId && telegramId.trim() !== '') {
+            if (telegramId?.trim()) {
                 try {
                     const { sendCredentialsToUser } = require('./telegramBot');
                     await sendCredentialsToUser(telegramId, username, password);
                     telegramSent = true;
-                    console.log(`✅ Данные отправлены в Telegram: ${telegramId}`);
                 } catch (e) {
-                    console.error('❌ Ошибка отправки в Telegram:', e.message);
+                    console.error('❌ Ошибка Telegram:', e.message);
                 }
             }
             
@@ -480,11 +484,9 @@ app.post('/api/admin/editors', authenticateToken, isAdmin, async (req, res) => {
                 id: editorId,
                 username,
                 email: email || null,
-                password: password,
+                password,
                 telegramSent,
-                message: telegramSent 
-                    ? 'Редактор создан. Данные отправлены в Telegram.' 
-                    : 'Редактор создан.'
+                message: telegramSent ? 'Редактор создан. Данные отправлены.' : 'Редактор создан.'
             });
         }
     );
@@ -511,17 +513,14 @@ app.put('/api/admin/editors/:id', authenticateToken, isAdmin, (req, res) => {
         updates.push('password = ?');
         params.push(hash);
         
-        // Обновляем временное хранилище
-        tempPasswords.set(editorId, password);
-        
-        // Сбрасываем таймер удаления
-        setTimeout(() => {
-            tempPasswords.delete(editorId);
-        }, 24 * 60 * 60 * 1000);
+        tempPasswords.set(editorId, {
+            password,
+            expires: Date.now() + 24 * 60 * 60 * 1000
+        });
     }
     
     if (updates.length === 0) {
-        return res.status(400).json({ error: 'Нет данных для обновления' });
+        return res.status(400).json({ error: 'Нет данных' });
     }
     
     params.push(editorId);
@@ -536,14 +535,12 @@ app.put('/api/admin/editors/:id', authenticateToken, isAdmin, (req, res) => {
             db.get(`SELECT id, username, email, created_at FROM users WHERE id = ?`, [editorId], (err, editor) => {
                 if (err) return res.status(500).json({ error: err.message });
                 
-                const editorWithPassword = {
-                    ...editor,
-                    password: tempPasswords.get(editorId) || null
-                };
-                
                 res.json({ 
                     message: 'Редактор обновлен',
-                    editor: editorWithPassword
+                    editor: {
+                        ...editor,
+                        password: tempPasswords.get(editorId)?.password || null
+                    }
                 });
             });
         }
@@ -557,14 +554,15 @@ app.delete('/api/admin/editors/:id', authenticateToken, isAdmin, (req, res) => {
         if (err) return res.status(500).json({ error: err.message });
         if (this.changes === 0) return res.status(404).json({ error: 'Редактор не найден' });
         
-        // Удаляем из временного хранилища
         tempPasswords.delete(editorId);
-        
         res.json({ message: 'Редактор удален' });
     });
 });
 
-// ============= ЗАЯВКИ =============
+// ============================================================================
+// ЗАЯВКИ
+// ============================================================================
+
 app.get('/api/admin/applications', authenticateToken, isAdmin, (req, res) => {
     db.all(`SELECT * FROM applications ORDER BY created_at DESC`, [], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -597,15 +595,21 @@ app.post('/api/admin/applications/:id/reject', authenticateToken, isAdmin, (req,
     });
 });
 
-// ============= ТЕСТОВЫЙ МАРШРУТ =============
+// ============================================================================
+// ТЕСТОВЫЙ МАРШРУТ
+// ============================================================================
+
 app.get('/api/test', (req, res) => {
     res.json({ message: 'Сервер работает', time: new Date().toISOString() });
 });
 
-// ============= ЗАПУСК =============
+// ============================================================================
+// ЗАПУСК
+// ============================================================================
+
 app.listen(PORT, () => {
     console.log(`✅ Сервер запущен на порту ${PORT}`);
-    console.log(`🌐 Главная страница: http://localhost:${PORT}/`);
+    console.log(`🌐 Главная: http://localhost:${PORT}/`);
     
     try {
         require('./telegramBot');
