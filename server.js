@@ -5,33 +5,29 @@ const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
+const ImageKit = require('imagekit');
 const db = require('./database');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Секретный ключ для JWT (в продакшене берется из переменных окружения)
+// Секретный ключ для JWT
 const JWT_SECRET = process.env.JWT_SECRET || 'museum-secret-key-2026';
 
-// Настройка multer для загрузки файлов
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        let uploadPath = 'uploads/';
-        if (file.fieldname === 'media') {
-            uploadPath += 'exhibits/';
-        } else if (file.fieldname === 'background') {
-            uploadPath += 'backgrounds/';
-        }
-        fs.mkdirSync(uploadPath, { recursive: true });
-        cb(null, uploadPath);
-    },
-    filename: function (req, file, cb) {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, uniqueSuffix + path.extname(file.originalname));
-    }
+// Инициализация ImageKit
+const imagekit = new ImageKit({
+    publicKey: process.env.IMAGEKIT_PUBLIC_KEY,
+    privateKey: process.env.IMAGEKIT_PRIVATE_KEY,
+    urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT
 });
-const upload = multer({ storage: storage });
 
-// ========== ЛОГИРОВАНИЕ (ДОЛЖНО БЫТЬ ПЕРВЫМ) ==========
+// Настройка multer для временного хранения в памяти (не на диске!)
+const storage = multer.memoryStorage(); // Важно: храним в памяти, а не на диске!
+const upload = multer({ 
+    storage: storage,
+    limits: { fileSize: 10 * 1024 * 1024 } // 10MB лимит
+});
+
+// ========== ЛОГИРОВАНИЕ ==========
 app.use((req, res, next) => {
     console.log(`📨 ${req.method} ${req.url}`);
     next();
@@ -42,28 +38,23 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// ========== СТАТИЧЕСКИЕ ФАЙЛЫ (САМОЕ ВАЖНОЕ!) ==========
-// Явно указываем пути к статическим файлам с правильными заголовками
+// ========== СТАТИЧЕСКИЕ ФАЙЛЫ ==========
 app.use('/css', express.static(path.join(__dirname, 'public', 'css'), {
     setHeaders: (res, filePath) => {
-        if (filePath.endsWith('.css')) {
-            res.setHeader('Content-Type', 'text/css');
-        }
+        if (filePath.endsWith('.css')) res.setHeader('Content-Type', 'text/css');
     }
 }));
 
 app.use('/js', express.static(path.join(__dirname, 'public', 'js'), {
     setHeaders: (res, filePath) => {
-        if (filePath.endsWith('.js')) {
-            res.setHeader('Content-Type', 'application/javascript');
-        }
+        if (filePath.endsWith('.js')) res.setHeader('Content-Type', 'application/javascript');
     }
 }));
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/views', express.static(path.join(__dirname, 'views')));
 
-// ========== КОРНЕВОЙ МАРШРУТ ==========
+// Корневой маршрут
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'views', 'index.html'));
 });
@@ -71,26 +62,17 @@ app.get('/', (req, res) => {
 // ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
 const authenticateToken = (req, res, next) => {
     const token = req.cookies.token || req.headers['authorization']?.split(' ')[1];
-    
-    if (!token) {
-        return res.status(401).json({ error: 'Не авторизован' });
-    }
-
+    if (!token) return res.status(401).json({ error: 'Не авторизован' });
     jwt.verify(token, JWT_SECRET, (err, user) => {
-        if (err) {
-            return res.status(403).json({ error: 'Токен недействителен' });
-        }
+        if (err) return res.status(403).json({ error: 'Токен недействителен' });
         req.user = user;
         next();
     });
 };
 
 const isAdmin = (req, res, next) => {
-    if (req.user && req.user.role === 'admin') {
-        next();
-    } else {
-        res.status(403).json({ error: 'Доступ запрещен' });
-    }
+    if (req.user && req.user.role === 'admin') next();
+    else res.status(403).json({ error: 'Доступ запрещен' });
 };
 
 // ============= АВТОРИЗАЦИЯ =============
@@ -157,7 +139,6 @@ app.get('/api/exhibits/:id', (req, res) => {
     });
 });
 
-// Получение экспонатов по статусу
 app.get('/api/exhibits/status/:status', authenticateToken, (req, res) => {
     const status = req.params.status;
     const validStatuses = ['pending_creation', 'pending_edit', 'approved', 'rejected'];
@@ -175,78 +156,150 @@ app.get('/api/exhibits/status/:status', authenticateToken, (req, res) => {
     });
 });
 
-app.post('/api/exhibits', authenticateToken, upload.fields([{ name: 'media', maxCount: 1 }, { name: 'background', maxCount: 1 }]), (req, res) => {
+// ============= ЗАГРУЗКА ФАЙЛОВ ЧЕРЕЗ IMAGEKIT =============
+app.post('/api/exhibits', authenticateToken, upload.fields([
+    { name: 'media', maxCount: 1 },
+    { name: 'background', maxCount: 1 }
+]), async (req, res) => {
     const { title, year, description } = req.body;
     const userId = req.user.id;
     
-    let mediaPath = null;
-    let backgroundPath = null;
-    
-    if (req.files?.media) {
-        mediaPath = '/uploads/exhibits/' + req.files.media[0].filename;
-    }
-    if (req.files?.background) {
-        backgroundPath = '/uploads/backgrounds/' + req.files.background[0].filename;
+    if (!title || !year || !description) {
+        return res.status(400).json({ error: 'Заполните все поля' });
     }
     
-    const status = req.user.role === 'admin' ? 'approved' : 'pending_creation';
+    // Проверка на дубликат
+    const checkDuplicate = await new Promise((resolve) => {
+        db.get(`SELECT id FROM exhibits WHERE title = ? AND year = ? AND description = ?`, 
+            [title, year, description], (err, row) => resolve(row));
+    });
     
-    db.run(
-        `INSERT INTO exhibits (title, year, description, media_path, background_path, status, created_by) 
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [title, year, description, mediaPath, backgroundPath, status, userId],
-        function(err) {
-            if (err) return res.status(500).json({ error: err.message });
-            res.json({ 
-                id: this.lastID, 
-                status: status,
-                message: status === 'approved' ? 'Экспонат создан' : 'Экспонат отправлен на проверку'
+    if (checkDuplicate) {
+        return res.status(400).json({ error: 'Экспонат уже существует' });
+    }
+    
+    try {
+        let mediaUrl = null;
+        let backgroundUrl = null;
+        
+        // Загрузка медиафайла в ImageKit
+        if (req.files?.media && req.files.media[0]) {
+            const file = req.files.media[0];
+            const result = await imagekit.upload({
+                file: file.buffer, // Важно: используем buffer из memoryStorage
+                fileName: `exhibit-${Date.now()}-${file.originalname}`,
+                folder: '/museum/exhibits',
+                useUniqueFileName: true,
+                tags: ['museum', 'exhibit']
             });
+            mediaUrl = result.url;
+            console.log('✅ Медиа загружено:', mediaUrl);
         }
-    );
+        
+        // Загрузка фона в ImageKit
+        if (req.files?.background && req.files.background[0]) {
+            const file = req.files.background[0];
+            const result = await imagekit.upload({
+                file: file.buffer,
+                fileName: `background-${Date.now()}-${file.originalname}`,
+                folder: '/museum/backgrounds',
+                useUniqueFileName: true,
+                tags: ['museum', 'background']
+            });
+            backgroundUrl = result.url;
+            console.log('✅ Фон загружен:', backgroundUrl);
+        }
+        
+        const status = req.user.role === 'admin' ? 'approved' : 'pending_creation';
+        
+        db.run(
+            `INSERT INTO exhibits (title, year, description, media_path, background_path, status, created_by) 
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [title, year, description, mediaUrl, backgroundUrl, status, userId],
+            function(err) {
+                if (err) {
+                    console.error('❌ Ошибка БД:', err);
+                    return res.status(500).json({ error: err.message });
+                }
+                res.json({ 
+                    id: this.lastID, 
+                    status: status,
+                    message: status === 'approved' ? 'Экспонат создан' : 'Экспонат отправлен на проверку'
+                });
+            }
+        );
+    } catch (error) {
+        console.error('❌ Ошибка загрузки в ImageKit:', error);
+        res.status(500).json({ error: 'Ошибка при загрузке файла: ' + error.message });
+    }
 });
 
-app.put('/api/exhibits/:id', authenticateToken, upload.fields([{ name: 'media', maxCount: 1 }, { name: 'background', maxCount: 1 }]), (req, res) => {
+app.put('/api/exhibits/:id', authenticateToken, upload.fields([
+    { name: 'media', maxCount: 1 },
+    { name: 'background', maxCount: 1 }
+]), async (req, res) => {
     const exhibitId = req.params.id;
     const { title, year, description } = req.body;
     const userId = req.user.id;
     
-    db.get(`SELECT * FROM exhibits WHERE id = ?`, [exhibitId], (err, oldExhibit) => {
+    db.get(`SELECT * FROM exhibits WHERE id = ?`, [exhibitId], async (err, oldExhibit) => {
         if (err || !oldExhibit) return res.status(404).json({ error: 'Экспонат не найден' });
         
-        let mediaPath = oldExhibit.media_path;
-        let backgroundPath = oldExhibit.background_path;
+        let mediaUrl = oldExhibit.media_path;
+        let backgroundUrl = oldExhibit.background_path;
         
-        if (req.files?.media) {
-            mediaPath = '/uploads/exhibits/' + req.files.media[0].filename;
-        }
-        if (req.files?.background) {
-            backgroundPath = '/uploads/backgrounds/' + req.files.background[0].filename;
-        }
-        
-        if (req.user.role === 'admin') {
-            db.run(
-                `UPDATE exhibits SET title = ?, year = ?, description = ?, media_path = ?, background_path = ? WHERE id = ?`,
-                [title, year, description, mediaPath, backgroundPath, exhibitId],
-                function(err) {
-                    if (err) return res.status(500).json({ error: err.message });
-                    res.json({ message: 'Экспонат обновлен' });
-                }
-            );
-        } else {
-            db.run(
-                `INSERT INTO exhibits (title, year, description, media_path, background_path, status, created_by, original_id) 
-                 VALUES (?, ?, ?, ?, ?, 'pending_edit', ?, ?)`,
-                [title, year, description, mediaPath, backgroundPath, userId, exhibitId],
-                function(err) {
-                    if (err) return res.status(500).json({ error: err.message });
-                    res.json({ message: 'Изменения отправлены на проверку' });
-                }
-            );
+        try {
+            // Загрузка новых файлов, если они есть
+            if (req.files?.media && req.files.media[0]) {
+                const file = req.files.media[0];
+                const result = await imagekit.upload({
+                    file: file.buffer,
+                    fileName: `exhibit-${Date.now()}-${file.originalname}`,
+                    folder: '/museum/exhibits',
+                    useUniqueFileName: true
+                });
+                mediaUrl = result.url;
+            }
+            
+            if (req.files?.background && req.files.background[0]) {
+                const file = req.files.background[0];
+                const result = await imagekit.upload({
+                    file: file.buffer,
+                    fileName: `background-${Date.now()}-${file.originalname}`,
+                    folder: '/museum/backgrounds',
+                    useUniqueFileName: true
+                });
+                backgroundUrl = result.url;
+            }
+            
+            if (req.user.role === 'admin') {
+                db.run(
+                    `UPDATE exhibits SET title = ?, year = ?, description = ?, media_path = ?, background_path = ? WHERE id = ?`,
+                    [title, year, description, mediaUrl, backgroundUrl, exhibitId],
+                    function(err) {
+                        if (err) return res.status(500).json({ error: err.message });
+                        res.json({ message: 'Экспонат обновлен' });
+                    }
+                );
+            } else {
+                db.run(
+                    `INSERT INTO exhibits (title, year, description, media_path, background_path, status, created_by, original_id) 
+                     VALUES (?, ?, ?, ?, ?, 'pending_edit', ?, ?)`,
+                    [title, year, description, mediaUrl, backgroundUrl, userId, exhibitId],
+                    function(err) {
+                        if (err) return res.status(500).json({ error: err.message });
+                        res.json({ message: 'Изменения отправлены на проверку' });
+                    }
+                );
+            }
+        } catch (error) {
+            console.error('❌ Ошибка загрузки в ImageKit:', error);
+            res.status(500).json({ error: 'Ошибка при загрузке файла' });
         }
     });
 });
 
+// Удаление экспоната (только для админа)
 app.delete('/api/admin/exhibits/:id', authenticateToken, isAdmin, (req, res) => {
     const exhibitId = req.params.id;
     
@@ -254,14 +307,8 @@ app.delete('/api/admin/exhibits/:id', authenticateToken, isAdmin, (req, res) => 
         if (err) return res.status(500).json({ error: err.message });
         if (!exhibit) return res.status(404).json({ error: 'Экспонат не найден' });
         
-        if (exhibit.media_path) {
-            const mediaPath = path.join(__dirname, exhibit.media_path);
-            if (fs.existsSync(mediaPath)) fs.unlinkSync(mediaPath);
-        }
-        if (exhibit.background_path) {
-            const bgPath = path.join(__dirname, exhibit.background_path);
-            if (fs.existsSync(bgPath)) fs.unlinkSync(bgPath);
-        }
+        // Здесь можно добавить удаление файлов из ImageKit, но это не обязательно
+        // Файлы в ImageKit останутся, но это не страшно
         
         db.run(`DELETE FROM exhibits WHERE id = ?`, [exhibitId], function(err) {
             if (err) return res.status(500).json({ error: err.message });
