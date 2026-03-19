@@ -107,8 +107,8 @@ function openCreateModal() {
     const titleId = generateUniqueId('title');
     const yearId = generateUniqueId('year');
     const descId = generateUniqueId('desc');
-    const mediaContainerId = `media-container-${generateUniqueId()}`;
-    const bgContainerId = `bg-container-${generateUniqueId()}`;
+    const mediaContainerId = generateUniqueId('media-container');
+    const backgroundContainerId = generateUniqueId('background-container');
     
     const modalContent = `
         <div class="create-exhibit-form">
@@ -133,7 +133,7 @@ function openCreateModal() {
                 </div>
                 <div class="form-group">
                     <label>Фон (необязательно)</label>
-                    <div id="${bgContainerId}" class="background-upload-container"></div>
+                    <div id="${backgroundContainerId}" class="background-upload-container"></div>
                 </div>
             </div>
             <button class="submit-btn" id="create-exhibit-btn">✨ Создать</button>
@@ -146,9 +146,9 @@ function openCreateModal() {
         width: '900px'
     });
     
-    // Инициализация загрузчиков после того, как DOM обновился
+    // Инициализация загрузчиков с правильными ID
     setTimeout(() => {
-        initCreateUploaders(mediaContainerId, bgContainerId);
+        initCreateUploaders(mediaContainerId, backgroundContainerId);
     }, 100);
     
     document.getElementById('create-exhibit-btn').addEventListener('click', async () => {
@@ -195,24 +195,8 @@ function openCreateModal() {
     });
 }
 
-// ============================================================================
-// ИНИЦИАЛИЗАЦИЯ ЗАГРУЗЧИКОВ (ИСПРАВЛЕННАЯ ВЕРСИЯ)
-// ============================================================================
-
-function initCreateUploaders(mediaContainerId, bgContainerId) {
-    // Убеждаемся, что контейнеры существуют
-    const mediaContainer = document.getElementById(mediaContainerId);
-    const bgContainer = document.getElementById(bgContainerId);
-    
-    if (!mediaContainer || !bgContainer) {
-        console.error('Контейнеры для загрузки не найдены');
-        return;
-    }
-    
-    // Очищаем контейнеры
-    mediaContainer.innerHTML = '';
-    bgContainer.innerHTML = '';
-    
+// Обновленная функция инициализации загрузчиков
+function initCreateUploaders(mediaContainerId, backgroundContainerId) {
     const mediaUploader = new FileUploader({
         onUpload: (file) => console.log('Медиа:', file.name)
     });
@@ -222,100 +206,68 @@ function initCreateUploaders(mediaContainerId, bgContainerId) {
         accept: 'image/*'
     });
     
-    // Создаем области загрузки
     mediaUploader.createUploadArea(mediaContainerId, 'media');
-    bgUploader.createUploadArea(bgContainerId, 'background');
+    bgUploader.createUploadArea(backgroundContainerId, 'background');
+}
+
+function initCreateUploaders() {
+    const mediaUploader = new FileUploader({
+        onUpload: (file) => console.log('Медиа:', file.name)
+    });
+    
+    const bgUploader = new FileUploader({
+        onUpload: (file) => console.log('Фон:', file.name),
+        accept: 'image/*'
+    });
+    
+    mediaUploader.createUploadArea('media-upload-container', 'media');
+    bgUploader.createUploadArea('background-upload-container', 'background');
 }
 
 // ============================================================================
-// ИНИЦИАЛИЗАЦИЯ ЗАГРУЗЧИКОВ ДЛЯ РЕДАКТИРОВАНИЯ
+// РЕДАКТИРОВАНИЕ ЭКСПОНАТА
 // ============================================================================
 
-function initEditUploaders(mediaContainerId, bgContainerId) {
-    const mediaContainer = document.getElementById(mediaContainerId);
-    const bgContainer = document.getElementById(bgContainerId);
+async function openEditModal() {
+    let modalContent = '';
     
-    if (!mediaContainer || !bgContainer) {
-        console.error('Контейнеры для редактирования не найдены');
-        return;
+    if (currentUser.role === 'admin') {
+        modalContent = `
+            <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                <select id="edit-mode-select" class="admin-select">
+                    <option value="edit">✏️ Редактировать</option>
+                    <option value="pending">⏳ На проверке</option>
+                    <option value="pending-edits">🔄 Изменения</option>
+                </select>
+            </div>
+            <div id="edit-mode-content"></div>
+        `;
+    } else {
+        modalContent = `
+            <div class="form-group">
+                <label for="exhibit-select">Выберите экспонат:</label>
+                <select id="exhibit-select" class="admin-select">
+                    <option value="">-- Выберите --</option>
+                    ${exhibits.filter(e => e.status === 'approved').map(e => 
+                        `<option value="${e.id}">${e.title} (${e.year})</option>`
+                    ).join('')}
+                </select>
+            </div>
+            <div id="edit-form-container"></div>
+        `;
     }
     
-    mediaContainer.innerHTML = '';
-    bgContainer.innerHTML = '';
+    const modal = createModal({
+        title: '✏️ Редактирование',
+        content: modalContent,
+        width: '1000px'
+    });
     
-    const mediaUploader = new FileUploader({});
-    const bgUploader = new FileUploader({ accept: 'image/*' });
-    
-    mediaUploader.createUploadArea(mediaContainerId, 'media');
-    bgUploader.createUploadArea(bgContainerId, 'background');
-}
-
-// ============================================================================
-// ЗАГРУЗКА ЭКСПОНАТА ДЛЯ РЕДАКТИРОВАНИЯ
-// ============================================================================
-
-async function loadExhibitForEdit(exhibitId, containerId) {
-    try {
-        const response = await fetch(`/api/exhibits/${exhibitId}`);
-        const exhibit = await response.json();
-        
-        const container = document.getElementById(containerId);
-        const titleId = generateUniqueId('edit-title');
-        const yearId = generateUniqueId('edit-year');
-        const descId = generateUniqueId('edit-desc');
-        const mediaContainerId = `edit-media-${generateUniqueId()}`;
-        const bgContainerId = `edit-bg-${generateUniqueId()}`;
-        
-        container.innerHTML = getEditFormHTML(exhibit, titleId, yearId, descId, mediaContainerId, bgContainerId);
-        
-        setTimeout(() => {
-            initEditUploaders(mediaContainerId, bgContainerId);
-        }, 100);
-        
-        setupEditHandlers(exhibitId, exhibit);
-        
-    } catch (error) {
-        NotificationManager.show('Ошибка загрузки', 'error');
+    if (currentUser.role === 'admin') {
+        setupAdminEditModes(modal);
+    } else {
+        setupEditorEditMode(modal);
     }
-}
-
-function getEditFormHTML(exhibit, titleId, yearId, descId, mediaContainerId, bgContainerId) {
-    return `
-        <div class="create-exhibit-form">
-            <div class="form-left">
-                <div class="form-group">
-                    <label for="${titleId}">Название *</label>
-                    <input type="text" id="${titleId}" class="edit-title" value="${exhibit.title.replace(/"/g, '&quot;')}" required>
-                </div>
-                <div class="form-group">
-                    <label for="${yearId}">Год *</label>
-                    <input type="number" id="${yearId}" class="edit-year" value="${exhibit.year}" required>
-                </div>
-                <div class="form-group">
-                    <label for="${descId}">Описание *</label>
-                    <textarea id="${descId}" class="edit-description" required>${exhibit.description.replace(/"/g, '&quot;')}</textarea>
-                </div>
-            </div>
-            <div class="form-right">
-                <div class="form-group">
-                    <label>Медиафайл</label>
-                    <div id="${mediaContainerId}" class="edit-media-container"></div>
-                    ${exhibit.media_path ? `<p>Текущий: ${exhibit.media_path.split('/').pop()}</p>` : ''}
-                </div>
-                <div class="form-group">
-                    <label>Фон</label>
-                    <div id="${bgContainerId}" class="edit-background-container"></div>
-                    ${exhibit.background_path ? `<p>Текущий: ${exhibit.background_path.split('/').pop()}</p>` : ''}
-                </div>
-            </div>
-            <div style="display: flex; gap: 10px; margin-top: 15px;">
-                ${currentUser.role === 'admin' ? `
-                    <button class="submit-btn" id="delete-exhibit-btn" style="background: #ff6b6b; flex: 1;">🗑️ Удалить</button>
-                ` : ''}
-                <button class="submit-btn" id="update-exhibit-btn" style="flex: 2;">💾 Сохранить</button>
-            </div>
-        </div>
-    `;
 }
 
 function setupAdminEditModes(modal) {
@@ -1272,53 +1224,35 @@ window.rejectExhibit = async (id) => {
 };
 
 // ============================================================================
-// ВЫХОД (МАКСИМАЛЬНО ПРОСТАЯ И НАДЕЖНАЯ ВЕРСИЯ)
+// ВЫХОД 
 // ============================================================================
 
 async function logout() {
-    // Простое модальное окно подтверждения
-    const confirmContent = `
-        <div style="text-align: center; padding: 20px;">
-            <div style="font-size: 48px; margin-bottom: 20px;">👋</div>
-            <h3 style="color: #4ecdc4; margin-bottom: 20px;">Выход из системы</h3>
-            <p style="color: #e0e0e0; margin-bottom: 25px;">Вы уверены, что хотите выйти?</p>
-            <div style="display: flex; gap: 15px; justify-content: center;">
-                <button class="approve-btn" id="confirm-logout-yes" style="background: #4ecdc4; color: #0f172a; padding: 10px 30px;">Да, выйти</button>
-                <button class="reject-btn" id="confirm-logout-no" style="background: #ff6b6b; color: white; padding: 10px 30px;">Нет, остаться</button>
-            </div>
-        </div>
-    `;
+    // Простое подтверждение
+    if (!confirm('Вы уверены, что хотите выйти?')) {
+        return;
+    }
     
-    const confirmModal = createModal({
-        title: '⚠️ Подтверждение',
-        content: confirmContent,
-        width: '400px'
-    });
-    
-    document.getElementById('confirm-logout-yes').addEventListener('click', async () => {
-        confirmModal.close();
-        
-        try {
-            // Пытаемся выйти через API (не ждем ответа)
-            fetch('/api/logout', { 
-                method: 'POST', 
-                credentials: 'include' 
-            }).catch(() => {});
-            
-        } catch (error) {
+    try {
+        // Пытаемся отправить запрос на выход (но не ждем ответа)
+        fetch('/api/logout', { 
+            method: 'POST', 
+            credentials: 'include',
+            // Игнорируем ответ
+        }).catch(() => {
             // Игнорируем ошибки
-        }
+            console.log('Ошибка при выходе, но продолжаем');
+        });
         
-        // Просто перенаправляем на страницу входа в любом случае
+        // Показываем уведомление
         NotificationManager.show('Выход выполнен', 'info');
         
-        // Перенаправляем на страницу входа
-        setTimeout(() => {
-            window.location.href = '/views/login.html';
-        }, 500);
-    });
-    
-    document.getElementById('confirm-logout-no').addEventListener('click', () => {
-        confirmModal.close();
-    });
+        // Просто перенаправляем на страницу входа
+        window.location.href = '/views/login.html';
+        
+    } catch (error) {
+        console.error('Ошибка:', error);
+        // Даже при ошибке перенаправляем
+        window.location.href = '/views/login.html';
+    }
 }

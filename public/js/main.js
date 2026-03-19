@@ -123,75 +123,79 @@ class FileUploader {
     }
     
     createUploadArea(containerId, inputName) {
-        const container = document.getElementById(containerId);
-        if (!container) return;
+    const container = document.getElementById(containerId);
+    if (!container) {
+        console.error(`Контейнер с ID ${containerId} не найден`);
+        return;
+    }
+    
+    const uniqueId = this.generateUniqueId();
+    const fileInputId = `file-${uniqueId}`;
+    const previewId = `preview-${uniqueId}`;
+    
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.name = inputName;
+    fileInput.id = fileInputId;
+    fileInput.accept = this.accept;
+    fileInput.style.display = 'none';
+    
+    const uploadArea = document.createElement('div');
+    uploadArea.className = 'file-upload-area';
+    uploadArea.innerHTML = `
+        <label for="${fileInputId}" class="upload-placeholder" style="cursor: pointer; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#4ecdc4" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            <p>Нажмите для загрузки</p>
+            <small>Макс. 10MB</small>
+        </label>
+        <div class="upload-preview" id="${previewId}" style="display: none;"></div>
+    `;
+    
+    uploadArea.appendChild(fileInput);
+    
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
         
-        const uniqueId = this.generateUniqueId();
-        const fileInputId = `file-${uniqueId}`;
-        const previewId = `preview-${uniqueId}`;
+        if (file.size > this.maxSize) {
+            NotificationManager.show(`Файл слишком большой`, 'error');
+            return;
+        }
         
-        const fileInput = document.createElement('input');
-        fileInput.type = 'file';
-        fileInput.name = inputName;
-        fileInput.id = fileInputId;
-        fileInput.accept = this.accept;
-        fileInput.style.display = 'none';
+        const preview = document.getElementById(previewId);
+        const placeholder = uploadArea.querySelector('.upload-placeholder');
         
-        const uploadArea = document.createElement('div');
-        uploadArea.className = 'file-upload-area';
-        uploadArea.innerHTML = `
-            <label for="${fileInputId}" class="upload-placeholder" style="cursor: pointer; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#4ecdc4" stroke-width="2">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                    <polyline points="17 8 12 3 7 8"/>
-                    <line x1="12" y1="3" x2="12" y2="15"/>
-                </svg>
-                <p>Нажмите для загрузки</p>
-                <small>Макс. 10MB</small>
-            </label>
-            <div class="upload-preview" id="${previewId}" style="display: none;"></div>
-        `;
-        
-        uploadArea.appendChild(fileInput);
-        
-        fileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            
-            if (file.size > this.maxSize) {
-                NotificationManager.show(`Файл слишком большой`, 'error');
-                return;
-            }
-            
-            const preview = document.getElementById(previewId);
-            const placeholder = uploadArea.querySelector('.upload-placeholder');
-            
-            if (file.type.startsWith('image/')) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    preview.innerHTML = `<img src="${e.target.result}" alt="Preview" style="max-width: 100%; max-height: 150px;">`;
-                    preview.style.display = 'block';
-                    placeholder.style.display = 'none';
-                };
-                reader.readAsDataURL(file);
-            } else if (file.type.startsWith('video/')) {
-                const video = document.createElement('video');
-                video.src = URL.createObjectURL(file);
-                video.controls = true;
-                video.style.maxWidth = '100%';
-                video.style.maxHeight = '150px';
-                
-                preview.innerHTML = '';
-                preview.appendChild(video);
+        if (file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                preview.innerHTML = `<img src="${e.target.result}" alt="Preview" style="max-width: 100%; max-height: 150px;">`;
                 preview.style.display = 'block';
                 placeholder.style.display = 'none';
-            }
+            };
+            reader.readAsDataURL(file);
+        } else if (file.type.startsWith('video/')) {
+            const video = document.createElement('video');
+            video.src = URL.createObjectURL(file);
+            video.controls = true;
+            video.style.maxWidth = '100%';
+            video.style.maxHeight = '150px';
             
-            this.onUpload(file, inputName);
-        });
+            preview.innerHTML = '';
+            preview.appendChild(video);
+            preview.style.display = 'block';
+            placeholder.style.display = 'none';
+        }
         
-        container.appendChild(uploadArea);
-    }
+        this.onUpload(file, inputName);
+    });
+    
+    container.innerHTML = ''; // Очищаем контейнер перед добавлением
+    container.appendChild(uploadArea);
+}
 }
 
 // ============================================================================
