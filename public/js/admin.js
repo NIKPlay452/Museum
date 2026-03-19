@@ -60,6 +60,11 @@ function setupAdminButtons() {
     if (currentUser?.role === 'admin') {
         document.querySelector('[data-action="editors"]').addEventListener('click', openEditorsModal);
         document.querySelector('[data-action="applications"]').addEventListener('click', openApplicationsModal);
+        
+        // Принудительная загрузка экспонатов каждые 30 секунд
+        setInterval(async () => {
+            await loadExhibits(true);
+        }, 30000);
     }
 }
 
@@ -74,12 +79,13 @@ function setupLogout() {
 // ЗАГРУЗКА ЭКСПОНАТОВ
 // ============================================================================
 
-async function loadExhibits(forceRefresh = false) {
+async function loadExhibits(forceRefresh = true) {
     try {
         exhibits = await fetchWithCache('/api/exhibits/all', 'exhibits', forceRefresh);
+        console.log('📦 Загружено экспонатов:', exhibits.length);
         return exhibits;
     } catch (error) {
-        console.error('Ошибка загрузки экспонатов:', error);
+        console.error('❌ Ошибка загрузки экспонатов:', error);
         exhibits = [];
         return [];
     }
@@ -1226,10 +1232,15 @@ async function logout() {
         confirmModal.close();
         
         try {
-            await fetch('/api/logout', { 
+            // Отправляем запрос на выход
+            const response = await fetch('/api/logout', { 
                 method: 'POST', 
                 credentials: 'include' 
             });
+            
+            if (!response.ok) {
+                throw new Error('Ошибка при выходе');
+            }
             
             NotificationManager.show('Выход выполнен', 'info');
             
@@ -1237,6 +1248,9 @@ async function logout() {
             if (window.clearCache) {
                 window.clearCache();
             }
+            
+            // Очищаем локальные данные
+            AppCache.user = null;
             
             // Обновляем UI на всех страницах
             window.dispatchEvent(new Event('authChange'));
@@ -1247,13 +1261,16 @@ async function logout() {
             }
             
             // Перенаправляем на главную
-            setTimeout(() => {
-                window.location.href = '/views/index.html';
-            }, 500);
+            window.location.href = '/views/index.html';
             
         } catch (error) {
             console.error('Ошибка при выходе:', error);
             NotificationManager.show('Ошибка при выходе', 'error');
+            
+            // Даже при ошибке пытаемся перенаправить
+            setTimeout(() => {
+                window.location.href = '/views/index.html';
+            }, 1000);
         }
     });
     

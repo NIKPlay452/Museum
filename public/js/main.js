@@ -293,25 +293,32 @@ async function fetchWithCache(url, cacheKey, forceRefresh = false) {
     }
 }
 
-// Очистка кэша (ИСПРАВЛЕННАЯ ВЕРСИЯ)
+// ============================================================================
+// ОЧИСТКА КЭША (ПОЛНОСТЬЮ ИСПРАВЛЕННАЯ ВЕРСИЯ)
+// ============================================================================
+
 function clearCache(key = null) {
-    if (key && AppCache.hasOwnProperty(key)) {
-        AppCache[key] = null;
+    // Если передан конкретный ключ
+    if (key && typeof key === 'string') {
+        if (AppCache.hasOwnProperty(key)) {
+            AppCache[key] = null;
+        }
         if (AppCache.lastFetch && AppCache.lastFetch.hasOwnProperty(key)) {
             AppCache.lastFetch[key] = 0;
         }
-    } else if (key === null) {
-        // Очищаем только существующие ключи
-        const cacheKeys = ['exhibits', 'editors', 'applications'];
-        cacheKeys.forEach(k => {
-            if (AppCache.hasOwnProperty(k)) {
-                AppCache[k] = null;
-            }
-            if (AppCache.lastFetch && AppCache.lastFetch.hasOwnProperty(k)) {
-                AppCache.lastFetch[k] = 0;
-            }
-        });
+        return;
     }
+    
+    // Очищаем все кэши, кроме user
+    const cacheKeys = ['exhibits', 'editors', 'applications'];
+    cacheKeys.forEach(k => {
+        if (AppCache.hasOwnProperty(k)) {
+            AppCache[k] = null;
+        }
+        if (AppCache.lastFetch && AppCache.lastFetch.hasOwnProperty(k)) {
+            AppCache.lastFetch[key] = 0;
+        }
+    });
 }
 
 // ============================================================================
