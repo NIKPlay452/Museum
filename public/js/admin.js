@@ -1207,86 +1207,35 @@ window.rejectExhibit = async (id) => {
 };
 
 // ============================================================================
-// ВЫХОД (ПОЛНОСТЬЮ ПЕРЕПИСАННАЯ ВЕРСИЯ)
+// ВЫХОД 
 // ============================================================================
 
 async function logout() {
-    const confirmContent = `
-        <div style="text-align: center; padding: 15px;">
-            <div style="font-size: 40px;">👋</div>
-            <h3 style="color: #4ecdc4;">Выйти?</h3>
-            <div style="display: flex; gap: 10px; justify-content: center; margin-top: 15px;">
-                <button class="approve-btn" id="confirm-logout-yes" style="background: #4ecdc4;">Да</button>
-                <button class="reject-btn" id="confirm-logout-no" style="background: #ff6b6b;">Нет</button>
-            </div>
-        </div>
-    `;
+    // Простое подтверждение
+    if (!confirm('Вы уверены, что хотите выйти?')) {
+        return;
+    }
     
-    const confirmModal = createModal({
-        title: '⚠️ Подтверждение',
-        content: confirmContent,
-        width: '350px'
-    });
-    
-    document.getElementById('confirm-logout-yes').addEventListener('click', async () => {
-        confirmModal.close();
+    try {
+        // Пытаемся отправить запрос на выход (но не ждем ответа)
+        fetch('/api/logout', { 
+            method: 'POST', 
+            credentials: 'include',
+            // Игнорируем ответ
+        }).catch(() => {
+            // Игнорируем ошибки
+            console.log('Ошибка при выходе, но продолжаем');
+        });
         
-        try {
-            // 1. Отправляем запрос на выход
-            const response = await fetch('/api/logout', { 
-                method: 'POST', 
-                credentials: 'include' 
-            });
-            
-            if (!response.ok) {
-                console.warn('Ответ сервера не OK, но продолжаем');
-            }
-            
-            // 2. Принудительно очищаем куки на клиенте
-            document.cookie.split(";").forEach(c => {
-                document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
-            });
-            
-            // 3. Очищаем localStorage и sessionStorage
-            try {
-                localStorage.clear();
-                sessionStorage.clear();
-            } catch (e) {
-                console.warn('Ошибка очистки storage:', e);
-            }
-            
-            // 4. Очищаем кэш приложения
-            if (window.clearCache) {
-                window.clearCache();
-            }
-            
-            // 5. Обновляем состояние
-            AppCache.user = null;
-            
-            // 6. Обновляем UI
-            window.dispatchEvent(new Event('authChange'));
-            if (window.updateAuthUI) {
-                window.updateAuthUI();
-            }
-            
-            // 7. Перенаправляем с полной перезагрузкой
-            NotificationManager.show('Выход выполнен', 'info');
-            
-            // Используем location.replace для полной очистки истории
-            setTimeout(() => {
-                window.location.replace('/views/index.html');
-            }, 500);
-            
-        } catch (error) {
-            console.error('Ошибка при выходе:', error);
-            NotificationManager.show('Ошибка при выходе', 'error');
-            
-            // Даже при ошибке пытаемся выйти
-            setTimeout(() => {
-                window.location.replace('/views/index.html');
-            }, 1000);
-        }
-    });
-    
-    document.getElementById('confirm-logout-no').addEventListener('click', () => confirmModal.close());
+        // Показываем уведомление
+        NotificationManager.show('Выход выполнен', 'info');
+        
+        // Просто перенаправляем на страницу входа
+        window.location.href = '/views/login.html';
+        
+    } catch (error) {
+        console.error('Ошибка:', error);
+        // Даже при ошибке перенаправляем
+        window.location.href = '/views/login.html';
+    }
 }
