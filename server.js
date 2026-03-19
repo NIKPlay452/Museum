@@ -20,6 +20,9 @@ const imagekit = new ImageKit({
     urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT
 });
 
+// Временное хранилище паролей редакторов (в памяти)
+const tempPasswords = new Map();
+
 // Настройка multer для временного хранения в памяти
 const storage = multer.memoryStorage();
 const upload = multer({ 
@@ -63,6 +66,7 @@ app.get('/', (req, res) => {
 const authenticateToken = (req, res, next) => {
     const token = req.cookies.token || req.headers['authorization']?.split(' ')[1];
     if (!token) return res.status(401).json({ error: 'Не авторизован' });
+    
     jwt.verify(token, JWT_SECRET, (err, user) => {
         if (err) return res.status(403).json({ error: 'Токен недействителен' });
         req.user = user;
@@ -90,19 +94,11 @@ app.post('/api/login', (req, res) => {
             return res.status(401).json({ error: 'Неверный логин или пароль' });
         }
         
-        console.log('✅ Пользователь найден, проверяем пароль...');
-        
         bcrypt.compare(password, user.password, (err, isValid) => {
-            if (err) {
-                console.error('❌ Ошибка сравнения:', err);
-                return res.status(500).json({ error: 'Ошибка сервера' });
-            }
-            if (!isValid) {
+            if (err || !isValid) {
                 console.log('❌ Неверный пароль');
                 return res.status(401).json({ error: 'Неверный логин или пароль' });
             }
-            
-            console.log('✅ Пароль верный, создаем токен');
             
             const token = jwt.sign(
                 { id: user.id, username: user.username, role: user.role },
@@ -174,7 +170,6 @@ app.get('/api/exhibits/status/:status', authenticateToken, (req, res) => {
     });
 });
 
-// ============= ЗАГРУЗКА ФАЙЛОВ ЧЕРЕЗ IMAGEKIT =============
 app.post('/api/exhibits', authenticateToken, upload.fields([
     { name: 'media', maxCount: 1 },
     { name: 'background', maxCount: 1 }
@@ -200,32 +195,26 @@ app.post('/api/exhibits', authenticateToken, upload.fields([
         let mediaUrl = null;
         let backgroundUrl = null;
         
-        // Загрузка медиафайла в ImageKit
         if (req.files?.media && req.files.media[0]) {
             const file = req.files.media[0];
             const result = await imagekit.upload({
-                file: file.buffer, // Важно: используем buffer из memoryStorage
+                file: file.buffer,
                 fileName: `exhibit-${Date.now()}-${file.originalname}`,
                 folder: '/museum/exhibits',
-                useUniqueFileName: true,
-                tags: ['museum', 'exhibit']
+                useUniqueFileName: true
             });
             mediaUrl = result.url;
-            console.log('✅ Медиа загружено:', mediaUrl);
         }
         
-        // Загрузка фона в ImageKit
         if (req.files?.background && req.files.background[0]) {
             const file = req.files.background[0];
             const result = await imagekit.upload({
                 file: file.buffer,
                 fileName: `background-${Date.now()}-${file.originalname}`,
                 folder: '/museum/backgrounds',
-                useUniqueFileName: true,
-                tags: ['museum', 'background']
+                useUniqueFileName: true
             });
             backgroundUrl = result.url;
-            console.log('✅ Фон загружен:', backgroundUrl);
         }
         
         const status = req.user.role === 'admin' ? 'approved' : 'pending_creation';
@@ -235,10 +224,7 @@ app.post('/api/exhibits', authenticateToken, upload.fields([
              VALUES (?, ?, ?, ?, ?, ?, ?)`,
             [title, year, description, mediaUrl, backgroundUrl, status, userId],
             function(err) {
-                if (err) {
-                    console.error('❌ Ошибка БД:', err);
-                    return res.status(500).json({ error: err.message });
-                }
+                if (err) return res.status(500).json({ error: err.message });
                 res.json({ 
                     id: this.lastID, 
                     status: status,
@@ -248,7 +234,7 @@ app.post('/api/exhibits', authenticateToken, upload.fields([
         );
     } catch (error) {
         console.error('❌ Ошибка загрузки в ImageKit:', error);
-        res.status(500).json({ error: 'Ошибка при загрузке файла: ' + error.message });
+        res.status(500).json({ error: 'Ошибка при загрузке файла' });
     }
 });
 
@@ -267,7 +253,6 @@ app.put('/api/exhibits/:id', authenticateToken, upload.fields([
         let backgroundUrl = oldExhibit.background_path;
         
         try {
-            // Загрузка новых файлов, если они есть
             if (req.files?.media && req.files.media[0]) {
                 const file = req.files.media[0];
                 const result = await imagekit.upload({
@@ -317,16 +302,12 @@ app.put('/api/exhibits/:id', authenticateToken, upload.fields([
     });
 });
 
-// Удаление экспоната (только для админа)
 app.delete('/api/admin/exhibits/:id', authenticateToken, isAdmin, (req, res) => {
     const exhibitId = req.params.id;
     
     db.get(`SELECT media_path, background_path FROM exhibits WHERE id = ?`, [exhibitId], (err, exhibit) => {
         if (err) return res.status(500).json({ error: err.message });
         if (!exhibit) return res.status(404).json({ error: 'Экспонат не найден' });
-        
-        // Здесь можно добавить удаление файлов из ImageKit, но это не обязательно
-        // Файлы в ImageKit останутся, но это не страшно
         
         db.run(`DELETE FROM exhibits WHERE id = ?`, [exhibitId], function(err) {
             if (err) return res.status(500).json({ error: err.message });
@@ -410,7 +391,7 @@ app.post('/api/admin/reject/:id', authenticateToken, isAdmin, (req, res) => {
     });
 });
 
-// ============= РЕДАКТОРЫ =============
+// ============= РЕДАКТОРЫ (С ВРЕМЕННЫМ ХРАНЕНИЕМ ПАРОЛЕЙ) =============
 app.get('/api/admin/editors', authenticateToken, isAdmin, (req, res) => {
     console.log('📋 Запрос списка редакторов');
     
@@ -419,18 +400,31 @@ app.get('/api/admin/editors', authenticateToken, isAdmin, (req, res) => {
             console.error('❌ Ошибка получения редакторов:', err);
             return res.status(500).json({ error: err.message });
         }
-        console.log(`✅ Найдено редакторов: ${rows?.length || 0}`);
-        res.json(rows || []);
+        
+        // Добавляем пароли из временного хранилища
+        const editorsWithPasswords = rows.map(editor => ({
+            ...editor,
+            password: tempPasswords.get(editor.id) || null
+        }));
+        
+        console.log(`✅ Найдено редакторов: ${editorsWithPasswords.length}`);
+        res.json(editorsWithPasswords);
     });
 });
 
-app.delete('/api/admin/editors/:id', authenticateToken, isAdmin, (req, res) => {
-    const editorId = req.params.id;
-    db.run(`DELETE FROM users WHERE id = ? AND role = 'editor'`, [editorId], function(err) {
-        if (err) return res.status(500).json({ error: err.message });
-        if (this.changes === 0) return res.status(404).json({ error: 'Редактор не найден' });
-        res.json({ message: 'Редактор удален' });
-    });
+app.get('/api/admin/editors/:id/password', authenticateToken, isAdmin, (req, res) => {
+    const editorId = parseInt(req.params.id);
+    
+    const password = tempPasswords.get(editorId);
+    
+    if (password) {
+        res.json({ password });
+    } else {
+        res.json({ 
+            message: 'Пароль больше не доступен (истекло время хранения)',
+            hint: 'Вы можете сбросить пароль через редактирование'
+        });
+    }
 });
 
 app.post('/api/admin/editors', authenticateToken, isAdmin, async (req, res) => {
@@ -440,13 +434,12 @@ app.post('/api/admin/editors', authenticateToken, isAdmin, async (req, res) => {
         return res.status(400).json({ error: 'Логин и пароль обязательны' });
     }
     
-    console.log(`👤 Создание редактора: ${username}`);
+    console.log(`👤 Создание редактора: ${username} с паролем: ${password}`);
     
-    // Хэшируем пароль
+    // Хэшируем пароль для БД
     const salt = bcrypt.genSaltSync(10);
     const hash = bcrypt.hashSync(password, salt);
     
-    // Сначала создаем редактора в БД
     db.run(
         `INSERT INTO users (username, password, email, role) VALUES (?, ?, ?, 'editor')`,
         [username, hash, email || null],
@@ -462,31 +455,32 @@ app.post('/api/admin/editors', authenticateToken, isAdmin, async (req, res) => {
             const editorId = this.lastID;
             console.log(`✅ Редактор создан с ID: ${editorId}`);
             
+            // Сохраняем обычный пароль во временном хранилище (на 24 часа)
+            tempPasswords.set(editorId, password);
+            
+            // Автоматически удаляем через 24 часа
+            setTimeout(() => {
+                tempPasswords.delete(editorId);
+                console.log(`🕐 Пароль для редактора ${editorId} удален из временного хранилища`);
+            }, 24 * 60 * 60 * 1000);
+            
             let telegramSent = false;
-            // Отправляем данные в Telegram только если указан ID и бот инициализирован
             if (telegramId && telegramId.trim() !== '') {
                 try {
-                    // Пытаемся отправить, но не блокируем ответ, если не получилось
                     const { sendCredentialsToUser } = require('./telegramBot');
-                    const sent = await sendCredentialsToUser(telegramId, username, password);
-                    telegramSent = sent;
-                    if (sent) {
-                        console.log(`✅ Данные отправлены в Telegram: ${telegramId}`);
-                    } else {
-                        console.log(`⚠️ Не удалось отправить в Telegram: ${telegramId}`);
-                    }
+                    await sendCredentialsToUser(telegramId, username, password);
+                    telegramSent = true;
+                    console.log(`✅ Данные отправлены в Telegram: ${telegramId}`);
                 } catch (e) {
                     console.error('❌ Ошибка отправки в Telegram:', e.message);
-                    // Не блокируем создание редактора
                 }
             }
             
-            // Возвращаем данные редактора вместе с паролем
             res.json({ 
                 id: editorId,
                 username,
                 email: email || null,
-                password: password, // Отправляем оригинальный пароль для отображения
+                password: password,
                 telegramSent,
                 message: telegramSent 
                     ? 'Редактор создан. Данные отправлены в Telegram.' 
@@ -496,12 +490,10 @@ app.post('/api/admin/editors', authenticateToken, isAdmin, async (req, res) => {
     );
 });
 
-// Новый маршрут для обновления редактора
 app.put('/api/admin/editors/:id', authenticateToken, isAdmin, (req, res) => {
-    const editorId = req.params.id;
+    const editorId = parseInt(req.params.id);
     const { username, email, password } = req.body;
     
-    // Строим запрос динамически
     let updates = [];
     let params = [];
     
@@ -518,6 +510,14 @@ app.put('/api/admin/editors/:id', authenticateToken, isAdmin, (req, res) => {
         const hash = bcrypt.hashSync(password, salt);
         updates.push('password = ?');
         params.push(hash);
+        
+        // Обновляем временное хранилище
+        tempPasswords.set(editorId, password);
+        
+        // Сбрасываем таймер удаления
+        setTimeout(() => {
+            tempPasswords.delete(editorId);
+        }, 24 * 60 * 60 * 1000);
     }
     
     if (updates.length === 0) {
@@ -533,41 +533,36 @@ app.put('/api/admin/editors/:id', authenticateToken, isAdmin, (req, res) => {
             if (err) return res.status(500).json({ error: err.message });
             if (this.changes === 0) return res.status(404).json({ error: 'Редактор не найден' });
             
-            // Возвращаем обновленные данные
             db.get(`SELECT id, username, email, created_at FROM users WHERE id = ?`, [editorId], (err, editor) => {
                 if (err) return res.status(500).json({ error: err.message });
+                
+                const editorWithPassword = {
+                    ...editor,
+                    password: tempPasswords.get(editorId) || null
+                };
+                
                 res.json({ 
                     message: 'Редактор обновлен',
-                    editor: editor
+                    editor: editorWithPassword
                 });
             });
         }
     );
 });
 
-// Новый маршрут для смены пароля редактора (опционально)
-app.put('/api/admin/editors/:id/password', authenticateToken, isAdmin, (req, res) => {
-    const editorId = req.params.id;
-    const { newPassword } = req.body;
+app.delete('/api/admin/editors/:id', authenticateToken, isAdmin, (req, res) => {
+    const editorId = parseInt(req.params.id);
     
-    if (!newPassword) {
-        return res.status(400).json({ error: 'Новый пароль обязателен' });
-    }
-    
-    const salt = bcrypt.genSaltSync(10);
-    const hash = bcrypt.hashSync(newPassword, salt);
-    
-    db.run(
-        `UPDATE users SET password = ? WHERE id = ? AND role = 'editor'`,
-        [hash, editorId],
-        function(err) {
-            if (err) return res.status(500).json({ error: err.message });
-            if (this.changes === 0) return res.status(404).json({ error: 'Редактор не найден' });
-            res.json({ message: 'Пароль успешно изменен' });
-        }
-    );
+    db.run(`DELETE FROM users WHERE id = ? AND role = 'editor'`, [editorId], function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+        if (this.changes === 0) return res.status(404).json({ error: 'Редактор не найден' });
+        
+        // Удаляем из временного хранилища
+        tempPasswords.delete(editorId);
+        
+        res.json({ message: 'Редактор удален' });
+    });
 });
-
 
 // ============= ЗАЯВКИ =============
 app.get('/api/admin/applications', authenticateToken, isAdmin, (req, res) => {

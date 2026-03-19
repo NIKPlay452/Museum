@@ -30,17 +30,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (currentUser.role === 'admin') {
       document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'block');
       
-      // Обработчик кнопки заявок
       const applicationsBtn = document.querySelector('[data-action="applications"]');
       if (applicationsBtn) {
         applicationsBtn.addEventListener('click', openApplicationsModal);
       }
     }
     
-    // Загрузка списка экспонатов
     await loadExhibits();
     
-    // Обработчик кнопки выхода
     if (logoutBtn) {
       logoutBtn.addEventListener('click', logout);
     }
@@ -50,7 +47,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.location.href = '/views/login.html';
   }
   
-  // Обработчики основных кнопок
   document.querySelector('[data-action="create"]').addEventListener('click', openCreateModal);
   document.querySelector('[data-action="edit"]').addEventListener('click', openEditModal);
   document.querySelector('[data-action="status"]').addEventListener('click', openStatusModal);
@@ -114,7 +110,6 @@ function openCreateModal() {
     width: '900px'
   });
   
-  // Инициализация загрузчиков файлов
   const mediaUploader = new FileUploader({
     onUpload: (file, fieldName) => {
       console.log('Загружен файл:', file.name, 'поле:', fieldName);
@@ -131,7 +126,6 @@ function openCreateModal() {
   mediaUploader.createUploadArea('media-upload-container', 'media-preview', 'media');
   backgroundUploader.createUploadArea('background-upload-container', 'background-preview', 'background');
   
-  // Отправка формы
   document.getElementById('create-exhibit-btn').addEventListener('click', async () => {
     const title = document.getElementById('exhibit-title').value;
     const year = document.getElementById('exhibit-year').value;
@@ -142,7 +136,6 @@ function openCreateModal() {
       return;
     }
     
-    // Проверяем на дубликат
     const checkResponse = await fetch('/api/exhibits/check-duplicate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -196,7 +189,6 @@ async function openEditModal() {
   let modalContent = '';
   
   if (currentUser.role === 'admin') {
-    // Для админа с выбором режима
     modalContent = `
       <div style="display: flex; gap: 20px; margin-bottom: 30px;">
         <select id="edit-mode-select" class="admin-select" style="flex: 1;">
@@ -208,7 +200,6 @@ async function openEditModal() {
       <div id="edit-mode-content"></div>
     `;
   } else {
-    // Для редактора простой выбор
     modalContent = `
       <div class="form-group">
         <label>Выберите экспонат для редактирования:</label>
@@ -263,7 +254,6 @@ async function openEditModal() {
       }
     });
     
-    // Загрузка начального состояния
     contentDiv.innerHTML = `
       <div class="form-group">
         <label>Выберите экспонат для редактирования:</label>
@@ -348,7 +338,6 @@ async function loadExhibitForEdit(exhibitId, containerId) {
     mediaUploader.createUploadArea('edit-media-container', 'edit-media-preview', 'media');
     bgUploader.createUploadArea('edit-background-container', 'edit-background-preview', 'background');
     
-    // Функция проверки дубликата
     async function checkDuplicate(excludeCurrent = true) {
       const title = document.getElementById('edit-title').value;
       const year = document.getElementById('edit-year').value;
@@ -369,7 +358,6 @@ async function loadExhibitForEdit(exhibitId, containerId) {
       return checkData.exists;
     }
     
-    // Обработчик обновления
     document.getElementById('update-exhibit-btn').addEventListener('click', async () => {
       const title = document.getElementById('edit-title').value;
       const year = document.getElementById('edit-year').value;
@@ -380,7 +368,6 @@ async function loadExhibitForEdit(exhibitId, containerId) {
         return;
       }
       
-      // Проверяем на дубликат
       const isDuplicate = await checkDuplicate(true);
       if (isDuplicate) {
         NotificationManager.show('Экспонат с таким названием, годом и описанием уже существует!', 'error');
@@ -421,10 +408,8 @@ async function loadExhibitForEdit(exhibitId, containerId) {
       }
     });
     
-    // Обработчик удаления (только для админа)
     if (currentUser.role === 'admin') {
       document.getElementById('delete-exhibit-btn').addEventListener('click', () => {
-        // Создаём модальное окно подтверждения удаления
         const confirmContent = `
           <div style="text-align: center; padding: 20px;">
             <div style="font-size: 48px; margin-bottom: 20px;">⚠️</div>
@@ -458,7 +443,6 @@ async function loadExhibitForEdit(exhibitId, containerId) {
             if (response.ok) {
               NotificationManager.show('Экспонат успешно удален', 'success');
               setTimeout(() => {
-                // Закрываем все модальные окна
                 document.querySelectorAll('.modal-overlay').forEach(modal => modal.remove());
               }, 1500);
               await loadExhibits();
@@ -631,9 +615,8 @@ async function loadStatusList(status, container) {
   }
 }
 
-// ============= НОВЫЙ КОД ДЛЯ РЕДАКТОРОВ =============
+// ============= РЕДАКТОРЫ =============
 
-// Работа с редакторами
 async function openEditorsModal() {
   const modalContent = `
     <div style="margin-bottom: 20px;">
@@ -657,7 +640,7 @@ async function openEditorsModal() {
   await loadEditorsList();
 }
 
-// Загрузка списка редакторов с красивым отображением
+// Загрузка списка редакторов
 async function loadEditorsList() {
   const container = document.getElementById('editors-list-container');
   if (!container) return;
@@ -721,6 +704,9 @@ async function loadEditorsList() {
                 </span>
                 <span class="password-visible-${editor.id}" style="display: none;">Загрузка...</span>
               </p>
+              <small style="color: #94a3b8; display: block; margin-top: 5px;">
+                Нажмите на точки, чтобы увидеть пароль (доступен 24 часа)
+              </small>
             </div>
           </div>
         </div>
@@ -736,25 +722,65 @@ async function loadEditorsList() {
   }
 }
 
-// Функция для показа пароля
-window.togglePassword = function(element, editorId) {
+// Функция для показа/скрытия пароля (ИСПРАВЛЕННАЯ)
+window.togglePassword = async function(element, editorId) {
   const visibleSpan = document.querySelector(`.password-visible-${editorId}`);
-  if (visibleSpan) {
-    element.style.display = 'none';
-    visibleSpan.style.display = 'inline';
+  if (!visibleSpan) return;
+  
+  // Если уже виден пароль, просто скрываем
+  if (element.style.display === 'none') {
+    element.style.display = 'inline';
+    visibleSpan.style.display = 'none';
+    return;
+  }
+  
+  // Показываем индикатор загрузки
+  element.style.display = 'none';
+  visibleSpan.style.display = 'inline';
+  visibleSpan.textContent = 'Загрузка...';
+  
+  try {
+    const response = await fetch(`/api/admin/editors/${editorId}/password`, {
+      credentials: 'include'
+    });
     
-    // Здесь можно сделать запрос к серверу для получения пароля
-    // Пока показываем заглушку
-    visibleSpan.textContent = '••••••••';
+    if (!response.ok) {
+      throw new Error('Ошибка загрузки');
+    }
+    
+    const data = await response.json();
+    
+    if (data.password) {
+      // Показываем реальный пароль
+      visibleSpan.textContent = data.password;
+      
+      // Через 10 секунд скрываем
+      setTimeout(() => {
+        element.style.display = 'inline';
+        visibleSpan.style.display = 'none';
+      }, 10000);
+    } else {
+      // Показываем сообщение
+      visibleSpan.textContent = data.message || 'Пароль не найден';
+      
+      setTimeout(() => {
+        element.style.display = 'inline';
+        visibleSpan.style.display = 'none';
+      }, 3000);
+    }
+    
+  } catch (error) {
+    console.error('Ошибка:', error);
+    visibleSpan.textContent = 'Ошибка загрузки';
     
     setTimeout(() => {
       element.style.display = 'inline';
       visibleSpan.style.display = 'none';
-    }, 3000);
+    }, 2000);
   }
 };
 
-// Функция редактирования редактора
+// Редактирование редактора
 window.editEditor = async (id) => {
   try {
     const response = await fetch('/api/admin/editors');
@@ -915,7 +941,7 @@ function openCreateEditorModal() {
   });
 }
 
-// Удаление редактора с красивым подтверждением
+// Удаление редактора
 window.deleteEditor = async (id) => {
   const confirmContent = `
     <div style="text-align: center; padding: 20px;">
@@ -962,9 +988,8 @@ window.deleteEditor = async (id) => {
   });
 };
 
-// ============= КОНЕЦ НОВОГО КОДА =============
+// ============= ЗАЯВКИ =============
 
-// Просмотр заявок
 async function openApplicationsModal() {
   try {
     console.log('Загрузка заявок...');
@@ -1042,9 +1067,7 @@ async function openApplicationsModal() {
   }
 }
 
-// Открыть модальное окно создания редактора из заявки
 window.openCreateEditorFromApplicationModal = async (id) => {
-  // Сначала показываем подтверждение
   const confirmContent = `
     <div style="text-align: center; padding: 20px;">
       <div style="font-size: 48px; margin-bottom: 20px;">✅</div>
@@ -1147,7 +1170,6 @@ window.openCreateEditorFromApplicationModal = async (id) => {
   });
 };
 
-// Отклонение заявки с красивым подтверждением
 window.rejectApplication = async (id) => {
   const confirmContent = `
     <div style="text-align: center; padding: 20px;">
