@@ -1,7 +1,14 @@
 const TelegramBot = require('node-telegram-bot-api');
 const db = require('./database');
 
-const token = '8612678836:AAHoTSlgUPldFzsWqkpfWp0YlWytk2gp9Qk';
+const token = process.env.TELEGRAM_BOT_TOKEN;
+
+if (!token) {
+    console.error('❌ TELEGRAM_BOT_TOKEN не задан! Бот не запустится.');
+} else {
+    // Инициализация бота с токеном
+    bot = new TelegramBot(token, { polling: true });
+}
 const ADMIN_CHAT_ID = 5231666805;
 const SITE_URL = process.env.SITE_URL || 'https://museum-six-umber.vercel.app';
 
