@@ -30,13 +30,13 @@ setInterval(() => {
     for (const [id, { password, expires }] of tempPasswords.entries()) {
         if (expires < now) tempPasswords.delete(id);
     }
-}, 60 * 60 * 1000); // Проверка каждый час
+}, 60 * 60 * 1000);
 
 // Multer
 const storage = multer.memoryStorage();
 const upload = multer({ 
     storage,
-    limits: { fileSize: 10 * 1024 * 1024 } // 10MB
+    limits: { fileSize: 10 * 1024 * 1024 }
 });
 
 // ============================================================================
@@ -52,28 +52,21 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// Статические файлы с кэшированием
-const staticOptions = {
-    maxAge: '1d',
-    immutable: true
-};
-
+// Статические файлы
 app.use('/css', express.static(path.join(__dirname, 'public', 'css'), {
-    ...staticOptions,
     setHeaders: (res, filePath) => {
         if (filePath.endsWith('.css')) res.setHeader('Content-Type', 'text/css');
     }
 }));
 
 app.use('/js', express.static(path.join(__dirname, 'public', 'js'), {
-    ...staticOptions,
     setHeaders: (res, filePath) => {
         if (filePath.endsWith('.js')) res.setHeader('Content-Type', 'application/javascript');
     }
 }));
 
-app.use('/uploads', express.static(path.join(__dirname, 'uploads'), staticOptions));
-app.use('/views', express.static(path.join(__dirname, 'views'), staticOptions));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/views', express.static(path.join(__dirname, 'views')));
 
 // Корневой маршрут
 app.get('/', (req, res) => {
@@ -143,23 +136,23 @@ app.post('/api/login', (req, res) => {
 });
 
 app.post('/api/logout', (req, res) => {
-    // Очищаем куку на сервере
     res.clearCookie('token', {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
         path: '/'
     });
-    
-    // Дополнительно очищаем все возможные куки
     res.clearCookie('token', { path: '/views' });
     res.clearCookie('token', { path: '/api' });
-    
     res.json({ success: true });
 });
 
+app.get('/api/me', authenticateToken, (req, res) => {
+    res.json({ user: req.user });
+});
+
 // ============================================================================
-// ЭКСПОНАТЫ (ИСПРАВЛЕННАЯ ВЕРСИЯ)
+// ЭКСПОНАТЫ
 // ============================================================================
 
 app.get('/api/exhibits', (req, res) => {
@@ -227,16 +220,6 @@ app.post('/api/exhibits', authenticateToken, upload.fields([
     
     if (!title || !year || !description) {
         return res.status(400).json({ error: 'Заполните все поля' });
-    }
-    
-    // Проверка дубликата
-    const existing = await new Promise(resolve => 
-        db.get(`SELECT id FROM exhibits WHERE title = ? AND year = ? AND description = ?`, 
-            [title, year, description], (err, row) => resolve(row))
-    );
-    
-    if (existing) {
-        return res.status(400).json({ error: 'Экспонат уже существует' });
     }
     
     try {
@@ -488,7 +471,7 @@ app.post('/api/admin/reject/:id', authenticateToken, isAdmin, (req, res) => {
 });
 
 // ============================================================================
-// РЕДАКТОРЫ (С ВРЕМЕННЫМ ХРАНЕНИЕМ ПАРОЛЕЙ)
+// РЕДАКТОРЫ
 // ============================================================================
 
 app.get('/api/admin/editors', authenticateToken, isAdmin, (req, res) => {
@@ -544,7 +527,6 @@ app.post('/api/admin/editors', authenticateToken, isAdmin, async (req, res) => {
             
             const editorId = this.lastID;
             
-            // Сохраняем пароль на 24 часа
             tempPasswords.set(editorId, {
                 password,
                 expires: Date.now() + 24 * 60 * 60 * 1000
@@ -706,12 +688,31 @@ app.get('/api/test', (req, res) => {
 });
 
 // ============================================================================
+// ОБРАБОТКА 404 (должна быть ПОСЛЕ всех маршрутов)
+// ============================================================================
+
+app.use((req, res) => {
+    // Если запрос начинается с /api, возвращаем JSON с ошибкой
+    if (req.url.startsWith('/api/')) {
+        res.status(404).json({ error: 'Маршрут не найден' });
+    } else {
+        // Для всех остальных запросов возвращаем HTML
+        res.status(404).sendFile(path.join(__dirname, 'views', '404.html'));
+    }
+});
+
+// ============================================================================
 // ОБРАБОТКА ОШИБОК
 // ============================================================================
 
 app.use((err, req, res, next) => {
     console.error('❌ Необработанная ошибка:', err);
-    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+    
+    if (req.url.startsWith('/api/')) {
+        res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+    } else {
+        res.status(500).sendFile(path.join(__dirname, 'views', '500.html'));
+    }
 });
 
 // ============================================================================
