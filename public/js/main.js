@@ -14,7 +14,7 @@ const AppCache = {
     }
 };
 
-const CACHE_DURATION = 5000; // 5 секунд
+const CACHE_DURATION = 3000; // 3 секунды для более быстрого обновления
 
 // ============================================================================
 // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
@@ -22,14 +22,19 @@ const CACHE_DURATION = 5000; // 5 секунд
 
 // Форматирование даты
 function formatDate(dateString) {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('ru-RU', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    });
+    if (!dateString) return 'неизвестно';
+    try {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('ru-RU', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    } catch {
+        return 'неизвестно';
+    }
 }
 
 // Генерация пароля
@@ -85,6 +90,7 @@ const NotificationManager = {
             margin-bottom: 10px;
             word-break: break-word;
             font-size: 0.95rem;
+            z-index: 10000;
         `;
         notification.textContent = message;
         
@@ -113,22 +119,31 @@ class FileUploader {
         this.onUpload = options.onUpload || (() => {});
         this.accept = options.accept || 'image/*,video/*';
         this.maxSize = options.maxSize || 10 * 1024 * 1024;
+        this.uploadCounter = 0;
     }
     
-    createUploadArea(containerId, previewId, inputName) {
+    generateUniqueId() {
+        return `upload-${Date.now()}-${this.uploadCounter++}`;
+    }
+    
+    createUploadArea(containerId, inputName) {
         const container = document.getElementById(containerId);
         if (!container) return;
+        
+        const uniqueId = this.generateUniqueId();
+        const previewId = `preview-${uniqueId}`;
         
         const fileInput = document.createElement('input');
         fileInput.type = 'file';
         fileInput.name = inputName;
+        fileInput.id = `file-${uniqueId}`;
         fileInput.accept = this.accept;
         fileInput.style.display = 'none';
         
         const uploadArea = document.createElement('div');
         uploadArea.className = 'file-upload-area';
         uploadArea.innerHTML = `
-            <div class="upload-placeholder">
+            <label for="file-${uniqueId}" class="upload-placeholder" style="cursor: pointer; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#4ecdc4" stroke-width="2">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                     <polyline points="17 8 12 3 7 8"/>
@@ -136,12 +151,11 @@ class FileUploader {
                 </svg>
                 <p>Нажмите для загрузки</p>
                 <small>Макс. 10MB</small>
-            </div>
+            </label>
             <div class="upload-preview" id="${previewId}" style="display: none;"></div>
         `;
         
         uploadArea.appendChild(fileInput);
-        uploadArea.addEventListener('click', () => fileInput.click());
         
         fileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
@@ -158,7 +172,7 @@ class FileUploader {
             if (file.type.startsWith('image/')) {
                 const reader = new FileReader();
                 reader.onload = (e) => {
-                    preview.innerHTML = `<img src="${e.target.result}" alt="Preview">`;
+                    preview.innerHTML = `<img src="${e.target.result}" alt="Preview" style="max-width: 100%; max-height: 150px;">`;
                     preview.style.display = 'block';
                     placeholder.style.display = 'none';
                 };
@@ -168,7 +182,7 @@ class FileUploader {
                 video.src = URL.createObjectURL(file);
                 video.controls = true;
                 video.style.maxWidth = '100%';
-                video.style.maxHeight = '120px';
+                video.style.maxHeight = '150px';
                 
                 preview.innerHTML = '';
                 preview.appendChild(video);
@@ -201,7 +215,7 @@ function createModal(options = {}) {
     modal.style.width = width;
     
     modal.innerHTML = `
-        <button class="modal-close">&times;</button>
+        <button class="modal-close" aria-label="Закрыть">&times;</button>
         <h2 style="color: #4ecdc4; margin-bottom: 15px; font-size: 1.3rem;">${title}</h2>
         <div class="modal-body">${content}</div>
     `;
@@ -225,7 +239,7 @@ function createModal(options = {}) {
 }
 
 // ============================================================================
-// API ЗАПРОСЫ С КЭШИРОВАНИЕМ
+// API ЗАПРОСЫ
 // ============================================================================
 
 async function fetchAPI(url, options = {}) {
@@ -236,6 +250,11 @@ async function fetchAPI(url, options = {}) {
             ...options
         });
         
+        // Если ответ 401, просто возвращаем ошибку без уведомления
+        if (response.status === 401) {
+            throw new Error('unauthorized');
+        }
+        
         const data = await response.json();
         
         if (!response.ok) {
@@ -244,13 +263,17 @@ async function fetchAPI(url, options = {}) {
         
         return data;
     } catch (error) {
-        NotificationManager.show(error.message, 'error');
+        if (error.message !== 'unauthorized') {
+            NotificationManager.show(error.message, 'error');
+        }
         throw error;
     }
 }
 
-// Оптимизированный запрос с кэшированием
+// Запрос с кэшированием
 async function fetchWithCache(url, cacheKey, forceRefresh = false) {
+    if (!cacheKey) return fetchAPI(url);
+    
     const now = Date.now();
     
     if (!forceRefresh && 
@@ -278,10 +301,12 @@ function clearCache(key = null) {
             AppCache.lastFetch[key] = 0;
         }
     } else if (key === null) {
-        // Очищаем все кэши, кроме user
+        // Очищаем только существующие ключи
         const cacheKeys = ['exhibits', 'editors', 'applications'];
         cacheKeys.forEach(k => {
-            AppCache[k] = null;
+            if (AppCache.hasOwnProperty(k)) {
+                AppCache[k] = null;
+            }
             if (AppCache.lastFetch && AppCache.lastFetch.hasOwnProperty(k)) {
                 AppCache.lastFetch[k] = 0;
             }
@@ -362,13 +387,6 @@ document.addEventListener('DOMContentLoaded', () => {
         fetchAPI('/api/me').catch(() => {
             window.location.href = '/views/login.html';
         });
-    }
-    
-    // Предзагрузка данных для админ-панели
-    if (currentPage.includes('admin-panel.html')) {
-        setTimeout(() => {
-            fetchWithCache('/api/exhibits/all', 'exhibits');
-        }, 100);
     }
 });
 

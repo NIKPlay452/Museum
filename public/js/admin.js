@@ -4,6 +4,7 @@
 
 let currentUser = null;
 let exhibits = [];
+let modalCounter = 0;
 
 // ============================================================================
 // ИНИЦИАЛИЗАЦИЯ
@@ -21,7 +22,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         updateUserUI();
         setupAdminButtons();
-        await loadExhibits();
+        await loadExhibits(true); // Принудительная загрузка при старте
         setupLogout();
         
     } catch (error) {
@@ -85,34 +86,46 @@ async function loadExhibits(forceRefresh = false) {
 }
 
 // ============================================================================
+// ГЕНЕРАЦИЯ УНИКАЛЬНЫХ ID
+// ============================================================================
+
+function generateUniqueId(prefix = 'field') {
+    return `${prefix}-${Date.now()}-${modalCounter++}-${Math.random().toString(36).substr(2, 9)}`;
+}
+
+// ============================================================================
 // СОЗДАНИЕ ЭКСПОНАТА
 // ============================================================================
 
 function openCreateModal() {
+    const titleId = generateUniqueId('title');
+    const yearId = generateUniqueId('year');
+    const descId = generateUniqueId('desc');
+    
     const modalContent = `
         <div class="create-exhibit-form">
             <div class="form-left">
                 <div class="form-group">
-                    <label>Название *</label>
-                    <input type="text" id="exhibit-title" required placeholder="Apple Macintosh">
+                    <label for="${titleId}">Название *</label>
+                    <input type="text" id="${titleId}" class="exhibit-title" required placeholder="Apple Macintosh">
                 </div>
                 <div class="form-group">
-                    <label>Год *</label>
-                    <input type="number" id="exhibit-year" required placeholder="1984">
+                    <label for="${yearId}">Год *</label>
+                    <input type="number" id="${yearId}" class="exhibit-year" required placeholder="1984">
                 </div>
                 <div class="form-group">
-                    <label>Описание *</label>
-                    <textarea id="exhibit-description" required placeholder="Описание..."></textarea>
+                    <label for="${descId}">Описание *</label>
+                    <textarea id="${descId}" class="exhibit-description" required placeholder="Описание..."></textarea>
                 </div>
             </div>
             <div class="form-right">
                 <div class="form-group">
                     <label>Медиафайл *</label>
-                    <div id="media-upload-container"></div>
+                    <div class="media-upload-container"></div>
                 </div>
                 <div class="form-group">
                     <label>Фон (необязательно)</label>
-                    <div id="background-upload-container"></div>
+                    <div class="background-upload-container"></div>
                 </div>
             </div>
             <button class="submit-btn" id="create-exhibit-btn">✨ Создать</button>
@@ -125,12 +138,15 @@ function openCreateModal() {
         width: '900px'
     });
     
-    initUploaders();
+    // Инициализация загрузчиков с уникальными ID
+    setTimeout(() => {
+        initCreateUploaders();
+    }, 100);
     
     document.getElementById('create-exhibit-btn').addEventListener('click', async () => {
-        const title = document.getElementById('exhibit-title').value;
-        const year = document.getElementById('exhibit-year').value;
-        const description = document.getElementById('exhibit-description').value;
+        const title = document.querySelector('.exhibit-title').value;
+        const year = document.querySelector('.exhibit-year').value;
+        const description = document.querySelector('.exhibit-description').value;
         
         if (!title || !year || !description) {
             NotificationManager.show('Заполните все поля!', 'error');
@@ -171,7 +187,7 @@ function openCreateModal() {
     });
 }
 
-function initUploaders() {
+function initCreateUploaders() {
     const mediaUploader = new FileUploader({
         onUpload: (file) => console.log('Медиа:', file.name)
     });
@@ -181,8 +197,8 @@ function initUploaders() {
         accept: 'image/*'
     });
     
-    mediaUploader.createUploadArea('media-upload-container', 'media-preview', 'media');
-    bgUploader.createUploadArea('background-upload-container', 'background-preview', 'background');
+    mediaUploader.createUploadArea('media-upload-container', 'media');
+    bgUploader.createUploadArea('background-upload-container', 'background');
 }
 
 // ============================================================================
@@ -206,7 +222,7 @@ async function openEditModal() {
     } else {
         modalContent = `
             <div class="form-group">
-                <label>Выберите экспонат:</label>
+                <label for="exhibit-select">Выберите экспонат:</label>
                 <select id="exhibit-select" class="admin-select">
                     <option value="">-- Выберите --</option>
                     ${exhibits.filter(e => e.status === 'approved').map(e => 
@@ -265,7 +281,7 @@ function setupEditorEditMode(modal) {
 function getExhibitSelectHTML() {
     return `
         <div class="form-group">
-            <label>Выберите экспонат:</label>
+            <label for="exhibit-select">Выберите экспонат:</label>
             <select id="exhibit-select" class="admin-select">
                 <option value="">-- Выберите --</option>
                 ${exhibits.filter(e => e.status === 'approved').map(e => 
@@ -287,43 +303,49 @@ async function loadExhibitForEdit(exhibitId, containerId) {
         const exhibit = await response.json();
         
         const container = document.getElementById(containerId);
+        const titleId = generateUniqueId('edit-title');
+        const yearId = generateUniqueId('edit-year');
+        const descId = generateUniqueId('edit-desc');
         
-        container.innerHTML = getEditFormHTML(exhibit);
+        container.innerHTML = getEditFormHTML(exhibit, titleId, yearId, descId);
         
-        initEditUploaders();
-        setupEditHandlers(exhibitId, exhibit);
+        setTimeout(() => {
+            initEditUploaders();
+        }, 100);
+        
+        setupEditHandlers(exhibitId, exhibit, titleId, yearId, descId);
         
     } catch (error) {
         NotificationManager.show('Ошибка загрузки', 'error');
     }
 }
 
-function getEditFormHTML(exhibit) {
+function getEditFormHTML(exhibit, titleId, yearId, descId) {
     return `
         <div class="create-exhibit-form">
             <div class="form-left">
                 <div class="form-group">
-                    <label>Название *</label>
-                    <input type="text" id="edit-title" value="${exhibit.title.replace(/"/g, '&quot;')}" required>
+                    <label for="${titleId}">Название *</label>
+                    <input type="text" id="${titleId}" class="edit-title" value="${exhibit.title.replace(/"/g, '&quot;')}" required>
                 </div>
                 <div class="form-group">
-                    <label>Год *</label>
-                    <input type="number" id="edit-year" value="${exhibit.year}" required>
+                    <label for="${yearId}">Год *</label>
+                    <input type="number" id="${yearId}" class="edit-year" value="${exhibit.year}" required>
                 </div>
                 <div class="form-group">
-                    <label>Описание *</label>
-                    <textarea id="edit-description" required>${exhibit.description.replace(/"/g, '&quot;')}</textarea>
+                    <label for="${descId}">Описание *</label>
+                    <textarea id="${descId}" class="edit-description" required>${exhibit.description.replace(/"/g, '&quot;')}</textarea>
                 </div>
             </div>
             <div class="form-right">
                 <div class="form-group">
                     <label>Медиафайл</label>
-                    <div id="edit-media-container"></div>
+                    <div class="edit-media-container"></div>
                     ${exhibit.media_path ? `<p>Текущий: ${exhibit.media_path.split('/').pop()}</p>` : ''}
                 </div>
                 <div class="form-group">
                     <label>Фон</label>
-                    <div id="edit-background-container"></div>
+                    <div class="edit-background-container"></div>
                     ${exhibit.background_path ? `<p>Текущий: ${exhibit.background_path.split('/').pop()}</p>` : ''}
                 </div>
             </div>
@@ -341,15 +363,15 @@ function initEditUploaders() {
     const mediaUploader = new FileUploader({});
     const bgUploader = new FileUploader({ accept: 'image/*' });
     
-    mediaUploader.createUploadArea('edit-media-container', 'edit-media-preview', 'media');
-    bgUploader.createUploadArea('edit-background-container', 'edit-background-preview', 'background');
+    mediaUploader.createUploadArea('edit-media-container', 'media');
+    bgUploader.createUploadArea('edit-background-container', 'background');
 }
 
-function setupEditHandlers(exhibitId, exhibit) {
+function setupEditHandlers(exhibitId, exhibit, titleId, yearId, descId) {
     document.getElementById('update-exhibit-btn').addEventListener('click', async () => {
-        const title = document.getElementById('edit-title').value;
-        const year = document.getElementById('edit-year').value;
-        const description = document.getElementById('edit-description').value;
+        const title = document.querySelector('.edit-title').value;
+        const year = document.querySelector('.edit-year').value;
+        const description = document.querySelector('.edit-description').value;
         
         if (!title || !year || !description) {
             NotificationManager.show('Заполните все поля!', 'error');
@@ -604,7 +626,7 @@ async function openEditorsModal() {
     });
     
     document.getElementById('create-editor-btn').addEventListener('click', openCreateEditorModal);
-    await loadEditorsList();
+    await loadEditorsList(true);
 }
 
 async function loadEditorsList(forceRefresh = false) {
@@ -718,19 +740,23 @@ window.editEditor = async (id) => {
         return;
     }
     
+    const usernameId = generateUniqueId('edit-username');
+    const emailId = generateUniqueId('edit-email');
+    const passwordId = generateUniqueId('edit-password');
+    
     const modalContent = `
         <div class="create-exhibit-form" style="grid-template-columns: 1fr;">
             <div class="form-group">
-                <label>Логин</label>
-                <input type="text" id="edit-username" value="${editor.username}" required>
+                <label for="${usernameId}">Логин</label>
+                <input type="text" id="${usernameId}" class="edit-username" value="${editor.username}" required>
             </div>
             <div class="form-group">
-                <label>Email</label>
-                <input type="email" id="edit-email" value="${editor.email || ''}">
+                <label for="${emailId}">Email</label>
+                <input type="email" id="${emailId}" class="edit-email" value="${editor.email || ''}">
             </div>
             <div class="form-group">
-                <label>Новый пароль (необязательно)</label>
-                <input type="text" id="edit-password" placeholder="Оставьте пустым">
+                <label for="${passwordId}">Новый пароль (необязательно)</label>
+                <input type="text" id="${passwordId}" class="edit-password" placeholder="Оставьте пустым">
             </div>
             <button class="submit-btn" id="save-editor-changes-btn">💾 Сохранить</button>
         </div>
@@ -743,9 +769,9 @@ window.editEditor = async (id) => {
     });
     
     document.getElementById('save-editor-changes-btn').addEventListener('click', async () => {
-        const newUsername = document.getElementById('edit-username').value;
-        const newEmail = document.getElementById('edit-email').value;
-        const newPassword = document.getElementById('edit-password').value;
+        const newUsername = document.querySelector('.edit-username').value;
+        const newEmail = document.querySelector('.edit-email').value;
+        const newPassword = document.querySelector('.edit-password').value;
         
         const updateData = {};
         if (newUsername !== editor.username) updateData.username = newUsername;
@@ -787,24 +813,29 @@ window.editEditor = async (id) => {
 // ============================================================================
 
 function openCreateEditorModal() {
+    const usernameId = generateUniqueId('editor-username');
+    const passwordId = generateUniqueId('editor-password');
+    const emailId = generateUniqueId('editor-email');
+    const telegramId = generateUniqueId('editor-telegram');
+    
     const modalContent = `
         <div class="create-exhibit-form" style="grid-template-columns: 1fr;">
             <div class="form-group">
-                <label>Логин *</label>
-                <input type="text" id="editor-username" required placeholder="editor123">
+                <label for="${usernameId}">Логин *</label>
+                <input type="text" id="${usernameId}" class="editor-username" required placeholder="editor123">
             </div>
             <div class="form-group">
-                <label>Пароль *</label>
-                <input type="text" id="editor-password" required value="${generatePassword()}">
+                <label for="${passwordId}">Пароль *</label>
+                <input type="text" id="${passwordId}" class="editor-password" required value="${generatePassword()}">
                 <small>Будет отправлен в Telegram</small>
             </div>
             <div class="form-group">
-                <label>Email</label>
-                <input type="email" id="editor-email" placeholder="editor@mail.com">
+                <label for="${emailId}">Email</label>
+                <input type="email" id="${emailId}" class="editor-email" placeholder="editor@mail.com">
             </div>
             <div class="form-group">
-                <label>Telegram ID</label>
-                <input type="text" id="editor-telegram" placeholder="123456789">
+                <label for="${telegramId}">Telegram ID</label>
+                <input type="text" id="${telegramId}" class="editor-telegram" placeholder="123456789">
                 <small>Для отправки пароля</small>
             </div>
             <button class="submit-btn" id="save-editor-btn">👤 Создать</button>
@@ -818,10 +849,10 @@ function openCreateEditorModal() {
     });
     
     document.getElementById('save-editor-btn').addEventListener('click', async () => {
-        const username = document.getElementById('editor-username').value;
-        const password = document.getElementById('editor-password').value;
-        const email = document.getElementById('editor-email').value;
-        const telegramId = document.getElementById('editor-telegram').value;
+        const username = document.querySelector('.editor-username').value;
+        const password = document.querySelector('.editor-password').value;
+        const email = document.querySelector('.editor-email').value;
+        const telegramId = document.querySelector('.editor-telegram').value;
         
         if (!username || !password) {
             NotificationManager.show('Заполните логин и пароль!', 'error');
@@ -1002,6 +1033,7 @@ window.openCreateEditorFromApplicationModal = async (id) => {
             const application = await response.json();
             
             const plainPassword = generatePassword();
+            const passwordId = generateUniqueId('editor-password');
             
             const modalContent = `
                 <div class="create-exhibit-form" style="grid-template-columns: 1fr;">
@@ -1010,8 +1042,8 @@ window.openCreateEditorFromApplicationModal = async (id) => {
                         <input type="text" value="${application.username}" readonly style="background: #1a1f30;">
                     </div>
                     <div class="form-group">
-                        <label>Пароль</label>
-                        <input type="text" id="editor-password" value="${plainPassword}">
+                        <label for="${passwordId}">Пароль</label>
+                        <input type="text" id="${passwordId}" class="editor-password" value="${plainPassword}">
                         <small>Будет отправлен</small>
                     </div>
                     <div class="form-group">
@@ -1033,7 +1065,7 @@ window.openCreateEditorFromApplicationModal = async (id) => {
             });
             
             document.getElementById('save-editor-btn').addEventListener('click', async () => {
-                const finalPassword = document.getElementById('editor-password').value;
+                const finalPassword = document.querySelector('.editor-password').value;
                 
                 const createResponse = await fetch('/api/admin/editors', {
                     method: 'POST',
