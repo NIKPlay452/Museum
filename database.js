@@ -11,7 +11,9 @@ console.log(`📁 Используется БД: ${dbPath} (${isVercel ? 'Vercel
 
 if (!isVercel) {
     const dbDir = path.dirname(dbPath);
-    if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
+    if (!fs.existsSync(dbDir)) {
+        fs.mkdirSync(dbDir, { recursive: true });
+    }
 }
 
 const db = new sqlite3.Database(dbPath, (err) => {
@@ -23,11 +25,9 @@ const db = new sqlite3.Database(dbPath, (err) => {
     }
 });
 
-// Включаем WAL режим для производительности
-db.exec('PRAGMA journal_mode = WAL;');
-db.exec('PRAGMA synchronous = NORMAL;');
-db.exec('PRAGMA cache_size = 10000;');
-db.exec('PRAGMA temp_store = MEMORY;');
+// ============================================================================
+// ИНИЦИАЛИЗАЦИЯ ТАБЛИЦ
+// ============================================================================
 
 function initTables() {
     db.serialize(() => {
@@ -42,19 +42,25 @@ function initTables() {
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )`, (err) => {
             if (err) {
-                console.error('❌ Ошибка создания users:', err);
+                console.error('❌ Ошибка создания таблицы users:', err);
             } else {
-                console.log('✅ Таблица users создана');
+                console.log('✅ Таблица users создана/проверена');
                 
-                // Добавляем индексы
-                db.run('CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)');
-                db.run('CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)');
-                
-                // Проверяем и добавляем email
-                db.all("PRAGMA table_info(users)", (err, cols) => {
-                    if (!err && !cols.some(c => c.name === 'email')) {
-                        db.run('ALTER TABLE users ADD COLUMN email TEXT', (e) => {
-                            if (!e) console.log('✅ Добавлен email');
+                // Проверяем и добавляем колонку email, если её нет
+                db.all("PRAGMA table_info(users)", (err, columns) => {
+                    if (err) {
+                        console.error('❌ Ошибка при проверке структуры:', err);
+                        return;
+                    }
+                    
+                    const hasEmail = columns.some(col => col.name === 'email');
+                    if (!hasEmail) {
+                        db.run(`ALTER TABLE users ADD COLUMN email TEXT`, (err) => {
+                            if (err) {
+                                console.error('❌ Ошибка при добавлении email:', err);
+                            } else {
+                                console.log('✅ Колонка email добавлена в таблицу users');
+                            }
                         });
                     }
                 });
@@ -69,7 +75,7 @@ function initTables() {
             description TEXT NOT NULL,
             media_path TEXT,
             background_path TEXT,
-            status TEXT DEFAULT 'pending_creation' CHECK(status IN ('pending_creation', 'pending_edit', 'approved', 'rejected')),
+            status TEXT CHECK(status IN ('pending_creation', 'pending_edit', 'approved', 'rejected')) DEFAULT 'pending_creation',
             created_by INTEGER,
             original_id INTEGER,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -77,15 +83,9 @@ function initTables() {
             FOREIGN KEY (original_id) REFERENCES exhibits(id)
         )`, (err) => {
             if (err) {
-                console.error('❌ Ошибка создания exhibits:', err);
+                console.error('❌ Ошибка создания таблицы exhibits:', err);
             } else {
-                console.log('✅ Таблица exhibits создана');
-                
-                // Индексы для быстрого поиска
-                db.run('CREATE INDEX IF NOT EXISTS idx_exhibits_status ON exhibits(status)');
-                db.run('CREATE INDEX IF NOT EXISTS idx_exhibits_year ON exhibits(year)');
-                db.run('CREATE INDEX IF NOT EXISTS idx_exhibits_created_by ON exhibits(created_by)');
-                db.run('CREATE INDEX IF NOT EXISTS idx_exhibits_original ON exhibits(original_id)');
+                console.log('✅ Таблица exhibits создана/проверена');
             }
         });
 
@@ -101,24 +101,30 @@ function initTables() {
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )`, (err) => {
             if (err) {
-                console.error('❌ Ошибка создания applications:', err);
+                console.error('❌ Ошибка создания таблицы applications:', err);
             } else {
-                console.log('✅ Таблица applications создана');
-                
-                db.run('CREATE INDEX IF NOT EXISTS idx_applications_status ON applications(status)');
-                db.run('CREATE INDEX IF NOT EXISTS idx_applications_telegram ON applications(telegram_chat_id)');
+                console.log('✅ Таблица applications создана/проверена');
             }
         });
 
-        console.log('✅ Все таблицы созданы');
+        console.log('✅ Все таблицы созданы/проверены.');
+        
+        // Создаем админа по умолчанию
         createDefaultAdmin();
+        
+        // Добавляем базовые экспонаты, если их нет
+        seedExhibitsIfNeeded();
     });
 }
+
+// ============================================================================
+// СОЗДАНИЕ АДМИНА ПО УМОЛЧАНИЮ
+// ============================================================================
 
 function createDefaultAdmin() {
     db.get(`SELECT * FROM users WHERE role = 'admin'`, (err, row) => {
         if (err) {
-            console.error('❌ Ошибка проверки админа:', err);
+            console.error('❌ Ошибка при проверке админа:', err);
             return;
         }
         if (!row) {
@@ -132,10 +138,135 @@ function createDefaultAdmin() {
                     if (err) {
                         console.error('❌ Не удалось создать админа:', err);
                     } else {
-                        console.log('✅ Создан admin с паролем admin123');
+                        console.log('✅ Создан пользователь admin с паролем admin123');
                     }
                 }
             );
+        }
+    });
+}
+
+// ============================================================================
+// БАЗОВЫЕ ЭКСПОНАТЫ
+// ============================================================================
+
+const seedExhibits = [
+    {
+        title: "М-1 и МЭСМ",
+        year: 1951,
+        description: "Первые в континентальной Европе электронно-вычислительные машины. МЭСМ (Малая электронная счетная машина), созданная в Киеве под руководством С.А. Лебедева, и М-1, разработанная в Москве командой И.С. Брука, заложили фундамент советской компьютерной индустрии. Они были огромными, занимали целые комнаты, потребляли много энергии и работали на электронных лампах.",
+        media_path: "https://picsum.photos/id/0/800/600",
+        background_path: "https://picsum.photos/id/10/1920/1080"
+    },
+    {
+        title: "Урал-1",
+        year: 1959,
+        description: "Легендарная машина, с которой началась история уральской школы программирования. Это была ламповая ЭВМ первого поколения, предназначенная для решения инженерных и производственных задач. Ее габариты поражают: машина занимала площадь до 80 квадратных метров, но была значительно слабее современного мобильного телефона.",
+        media_path: "https://picsum.photos/id/1/800/600",
+        background_path: "https://picsum.photos/id/11/1920/1080"
+    },
+    {
+        title: "МИР-1",
+        year: 1968,
+        description: "«Машина для Инженерных Расчётов». Этот компьютер стал одним из первых в мире, кто был ориентирован на индивидуальную работу пользователя-непрограммиста. МИР-1 имел удобную клавиатуру и позволял вводить задачи на специальном алгоритмическом языке, что делало его предшественником современных персональных компьютеров.",
+        media_path: "https://picsum.photos/id/2/800/600",
+        background_path: "https://picsum.photos/id/12/1920/1080"
+    },
+    {
+        title: "ЕС ЭВМ (Ряд-1)",
+        year: 1971,
+        description: "«Единая система» — это семейство компьютеров, ставших стандартом для крупных предприятий, научных институтов и министерств всего СССР. Они были программно совместимы с американскими машинами IBM System/360, что позволило использовать наработанный западный софт. Это были огромные машинные залы с лентопротяжками и шкафами.",
+        media_path: "https://picsum.photos/id/3/800/600",
+        background_path: "https://picsum.photos/id/13/1920/1080"
+    },
+    {
+        title: "КР580ИК80",
+        year: 1975,
+        description: "Это не компьютер целиком, а его «сердце» — микропроцессор, советский аналог знаменитого Intel 8080. Он стал основой для тысяч любительских конструкций и множества серийных компьютеров. Его появление позволило энтузиастам по всему СССР собирать свои собственные ПК.",
+        media_path: "https://picsum.photos/id/4/800/600",
+        background_path: "https://picsum.photos/id/14/1920/1080"
+    },
+    {
+        title: "Микро-80",
+        year: 1982,
+        description: "Легендарный компьютер для самостоятельной сборки. Его схема была впервые опубликована в журнале «Радио», что дало старт настоящему движению. Хотя для сборки требовались серьезные навыки пайки и дефицитные детали, он открыл мир программирования для тысяч советских радиолюбителей.",
+        media_path: "https://picsum.photos/id/5/800/600",
+        background_path: "https://picsum.photos/id/15/1920/1080"
+    },
+    {
+        title: "Радио-86РК",
+        year: 1986,
+        description: "Упрощенная и доработанная версия «Микро-80», ставшая самым массовым любительским ПК в СССР. Его схема была опубликована в журнале «Радио» и, в отличие от предшественника, была доступна для повторения тысячам радиолюбителей. На его основе многие советские заводы начали выпуск первых серийных домашних компьютеров.",
+        media_path: "https://picsum.photos/id/6/800/600",
+        background_path: "https://picsum.photos/id/15/1920/1080"
+    },
+    {
+        title: "Апогей БК-01",
+        year: 1986,
+        description: "Один из промышленных клонов «Радио-86РК», выпускавшийся Тульским заводом «БРА». Такие компьютеры, собранные на оборонных предприятиях в рамках конверсии, поставлялись в школы и институты, становясь для многих первым знакомством с вычислительной техникой.",
+        media_path: "https://picsum.photos/id/7/800/600",
+        background_path: "https://picsum.photos/id/16/1920/1080"
+    },
+    {
+        title: "Электроника МС 1504",
+        year: 1991,
+        description: "Первый и, по сути, единственный серийный советский ноутбук. Выпускался в самом конце существования СССР на минском заводе «Интеграл». Он имел монохромный дисплей, процессор, совместимый с Intel 8086, и работал под управлением MS DOS, что делало его сопоставимым с западными моделями того времени.",
+        media_path: "https://picsum.photos/id/8/800/600",
+        background_path: "https://picsum.photos/id/17/1920/1080"
+    },
+    {
+        title: "ПК Magic",
+        year: 1995,
+        description: "Один из первых российских персональных компьютеров «народной» сборки. Он олицетворяет эпоху перехода от промышленных монстров к доступным персоналкам и зарождение частного ИТ-бизнеса в России начала 90-х.",
+        media_path: "https://picsum.photos/id/9/800/600",
+        background_path: "https://picsum.photos/id/17/1920/1080"
+    }
+];
+
+// ============================================================================
+// ДОБАВЛЕНИЕ БАЗОВЫХ ЭКСПОНАТОВ
+// ============================================================================
+
+function seedExhibitsIfNeeded() {
+    // Проверяем, есть ли уже экспонаты
+    db.get(`SELECT COUNT(*) as count FROM exhibits`, [], (err, row) => {
+        if (err) {
+            console.error('❌ Ошибка при проверке экспонатов:', err);
+            return;
+        }
+        
+        // Если экспонатов нет, добавляем базовые
+        if (row.count === 0) {
+            console.log('📦 Добавление базовых экспонатов...');
+            
+            // Получаем ID администратора (должен быть 1)
+            db.get(`SELECT id FROM users WHERE role = 'admin' LIMIT 1`, [], (err, admin) => {
+                if (err) {
+                    console.error('❌ Ошибка при поиске администратора:', err);
+                    return;
+                }
+                
+                const adminId = admin ? admin.id : 1;
+                
+                seedExhibits.forEach((exhibit, index) => {
+                    db.run(
+                        `INSERT INTO exhibits (title, year, description, media_path, background_path, status, created_by) 
+                         VALUES (?, ?, ?, ?, ?, 'approved', ?)`,
+                        [exhibit.title, exhibit.year, exhibit.description, exhibit.media_path, exhibit.background_path, adminId],
+                        function(err) {
+                            if (err) {
+                                console.error(`❌ Ошибка добавления экспоната "${exhibit.title}":`, err);
+                            } else {
+                                console.log(`✅ Добавлен экспонат ${index + 1}: ${exhibit.title}`);
+                            }
+                        }
+                    );
+                });
+                
+                console.log('✅ Все базовые экспонаты добавлены');
+            });
+        } else {
+            console.log(`ℹ️ В базе уже есть ${row.count} экспонатов, пропускаем инициализацию`);
         }
     });
 }
