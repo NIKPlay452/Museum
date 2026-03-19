@@ -668,30 +668,60 @@ async function loadEditorsList() {
       return;
     }
     
-    let html = '<ul class="editors-list">';
+    let html = '<div class="editors-grid">';
     
     editors.forEach(editor => {
       const date = new Date(editor.created_at).toLocaleDateString('ru-RU');
       
       html += `
-        <li>
-          <div>
-            <strong>${editor.username}</strong>
-            <br>
-            <small>Создан: ${date}</small>
+        <div class="editor-card" data-id="${editor.id}" style="
+          background: #0f172a;
+          border-left: 4px solid #4ecdc4;
+          padding: 20px;
+          margin-bottom: 15px;
+          border-radius: 8px;
+        ">
+          <div style="display: flex; justify-content: space-between; align-items: start;">
+            <div style="flex: 1;">
+              <h3 style="color: #4ecdc4; margin-bottom: 10px;">${editor.username}</h3>
+              <p><span style="color: #94a3b8;">Email:</span> ${editor.email || 'Не указан'}</p>
+              <p><span style="color: #94a3b8;">Создан:</span> ${date}</p>
+              <p><span style="color: #94a3b8;">Пароль:</span> 
+                <span class="password-hidden" onclick="togglePassword(this)" style="cursor: pointer; background: #1a1f30; padding: 3px 10px; border-radius: 4px;">
+                  ••••••••
+                </span>
+                <span class="password-visible" style="display: none;">${editor.password || 'Скрыт'}</span>
+              </p>
+            </div>
+            <button class="delete-editor" onclick="deleteEditor(${editor.id})" style="margin-left: 15px;">Удалить</button>
           </div>
-          <button class="delete-editor" onclick="deleteEditor(${editor.id})">Удалить</button>
-        </li>
+        </div>
       `;
     });
     
-    html += '</ul>';
+    html += '</div>';
     container.innerHTML = html;
     
   } catch (error) {
+    console.error('Ошибка загрузки редакторов:', error);
     container.innerHTML = '<p style="color: #ff6b6b;">Ошибка загрузки</p>';
   }
 }
+
+// Функция для показа/скрытия пароля
+window.togglePassword = function(element) {
+  const hidden = element;
+  const visible = element.nextElementSibling;
+  
+  if (hidden.style.display !== 'none') {
+    hidden.style.display = 'none';
+    visible.style.display = 'inline';
+    setTimeout(() => {
+      hidden.style.display = 'inline';
+      visible.style.display = 'none';
+    }, 3000);
+  }
+};
 
 // Создание редактора (обновленная версия)
 function openCreateEditorModal() {

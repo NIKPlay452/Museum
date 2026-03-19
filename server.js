@@ -20,8 +20,8 @@ const imagekit = new ImageKit({
     urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT
 });
 
-// Настройка multer для временного хранения в памяти (не на диске!)
-const storage = multer.memoryStorage(); // Важно: храним в памяти, а не на диске!
+// Настройка multer для временного хранения в памяти
+const storage = multer.memoryStorage();
 const upload = multer({ 
     storage: storage,
     limits: { fileSize: 10 * 1024 * 1024 } // 10MB лимит
@@ -78,13 +78,31 @@ const isAdmin = (req, res, next) => {
 // ============= АВТОРИЗАЦИЯ =============
 app.post('/api/login', (req, res) => {
     const { username, password } = req.body;
+    console.log(`🔐 Попытка входа: ${username}`);
     
     db.get(`SELECT * FROM users WHERE username = ?`, [username], (err, user) => {
-        if (err) return res.status(500).json({ error: 'Ошибка сервера' });
-        if (!user) return res.status(401).json({ error: 'Неверный логин или пароль' });
+        if (err) {
+            console.error('❌ Ошибка БД:', err);
+            return res.status(500).json({ error: 'Ошибка сервера' });
+        }
+        if (!user) {
+            console.log('❌ Пользователь не найден');
+            return res.status(401).json({ error: 'Неверный логин или пароль' });
+        }
+        
+        console.log('✅ Пользователь найден, проверяем пароль...');
         
         bcrypt.compare(password, user.password, (err, isValid) => {
-            if (err || !isValid) return res.status(401).json({ error: 'Неверный логин или пароль' });
+            if (err) {
+                console.error('❌ Ошибка сравнения:', err);
+                return res.status(500).json({ error: 'Ошибка сервера' });
+            }
+            if (!isValid) {
+                console.log('❌ Неверный пароль');
+                return res.status(401).json({ error: 'Неверный логин или пароль' });
+            }
+            
+            console.log('✅ Пароль верный, создаем токен');
             
             const token = jwt.sign(
                 { id: user.id, username: user.username, role: user.role },
@@ -394,7 +412,8 @@ app.post('/api/admin/reject/:id', authenticateToken, isAdmin, (req, res) => {
 
 // ============= РЕДАКТОРЫ =============
 app.get('/api/admin/editors', authenticateToken, isAdmin, (req, res) => {
-    db.all(`SELECT id, username, created_at FROM users WHERE role = 'editor'`, [], (err, rows) => {
+    // Теперь возвращаем больше информации о редакторах
+    db.all(`SELECT id, username, email, created_at FROM users WHERE role = 'editor'`, [], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(rows);
     });
@@ -404,6 +423,7 @@ app.delete('/api/admin/editors/:id', authenticateToken, isAdmin, (req, res) => {
     const editorId = req.params.id;
     db.run(`DELETE FROM users WHERE id = ? AND role = 'editor'`, [editorId], function(err) {
         if (err) return res.status(500).json({ error: err.message });
+        if (this.changes === 0) return res.status(404).json({ error: 'Редактор не найден' });
         res.json({ message: 'Редактор удален' });
     });
 });
@@ -411,37 +431,83 @@ app.delete('/api/admin/editors/:id', authenticateToken, isAdmin, (req, res) => {
 app.post('/api/admin/editors', authenticateToken, isAdmin, async (req, res) => {
     const { username, password, email, telegramId } = req.body;
     
-    if (!username || !password) return res.status(400).json({ error: 'Логин и пароль обязательны' });
+    if (!username || !password) {
+        return res.status(400).json({ error: 'Логин и пароль обязательны' });
+    }
     
+    console.log(`👤 Создание редактора: ${username}`);
+    
+    // Хэшируем пароль
     const salt = bcrypt.genSaltSync(10);
     const hash = bcrypt.hashSync(password, salt);
     
     db.run(
-        `INSERT INTO users (username, password, role) VALUES (?, ?, 'editor')`,
-        [username, hash],
+        `INSERT INTO users (username, password, email, role) VALUES (?, ?, ?, 'editor')`,
+        [username, hash, email || null],
         async function(err) {
             if (err) {
-                if (err.message.includes('UNIQUE')) return res.status(400).json({ error: 'Имя пользователя уже занято' });
+                console.error('❌ Ошибка создания редактора:', err);
+                if (err.message.includes('UNIQUE')) {
+                    return res.status(400).json({ error: 'Имя пользователя уже занято' });
+                }
                 return res.status(500).json({ error: err.message });
             }
             
+            console.log(`✅ Редактор создан с ID: ${this.lastID}`);
+            
             let telegramSent = false;
-            if (telegramId) {
+            // Отправляем данные в Telegram только если указан ID
+            if (telegramId && telegramId.trim() !== '') {
                 try {
                     const { sendCredentialsToUser } = require('./telegramBot');
                     await sendCredentialsToUser(telegramId, username, password);
                     telegramSent = true;
-                } catch (e) {}
+                    console.log(`✅ Данные отправлены в Telegram: ${telegramId}`);
+                } catch (e) {
+                    console.error('❌ Ошибка отправки в Telegram:', e.message);
+                }
+            } else {
+                console.log('ℹ️ Telegram ID не указан, пропускаем отправку');
             }
             
+            // Возвращаем созданного редактора вместе с паролем (для отображения админу)
             res.json({ 
                 id: this.lastID,
-                message: telegramSent ? 'Редактор создан. Данные отправлены в Telegram.' : 'Редактор создан.',
+                username,
+                email: email || null,
+                password: password, // Отправляем оригинальный пароль обратно
+                message: telegramSent 
+                    ? 'Редактор создан. Данные отправлены в Telegram.' 
+                    : 'Редактор создан.',
                 telegramSent
             });
         }
     );
 });
+
+// Новый маршрут для смены пароля редактора (опционально)
+app.put('/api/admin/editors/:id/password', authenticateToken, isAdmin, (req, res) => {
+    const editorId = req.params.id;
+    const { newPassword } = req.body;
+    
+    if (!newPassword) {
+        return res.status(400).json({ error: 'Новый пароль обязателен' });
+    }
+    
+    const salt = bcrypt.genSaltSync(10);
+    const hash = bcrypt.hashSync(newPassword, salt);
+    
+    db.run(
+        `UPDATE users SET password = ? WHERE id = ? AND role = 'editor'`,
+        [hash, editorId],
+        function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            if (this.changes === 0) return res.status(404).json({ error: 'Редактор не найден' });
+            res.json({ message: 'Пароль успешно изменен' });
+        }
+    );
+});
+
 
 // ============= ЗАЯВКИ =============
 app.get('/api/admin/applications', authenticateToken, isAdmin, (req, res) => {
