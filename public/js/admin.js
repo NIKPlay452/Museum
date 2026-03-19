@@ -655,23 +655,40 @@ async function openEditorsModal() {
   await loadEditorsList();
 }
 
-// Загрузка списка редакторов
+// Загрузка списка редакторов (исправленная версия)
 async function loadEditorsList() {
   const container = document.getElementById('editors-list-container');
+  if (!container) return;
+  
+  container.innerHTML = '<p style="color: #94a3b8; text-align: center;">Загрузка...</p>';
   
   try {
     const response = await fetch('/api/admin/editors');
-    const editors = await response.json();
     
-    if (editors.length === 0) {
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `HTTP ошибка ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log('📦 Данные редакторов:', data);
+    
+    // Проверяем, что data - это массив
+    if (!Array.isArray(data)) {
+      console.error('❌ Сервер вернул не массив:', data);
+      container.innerHTML = '<p style="color: #ff6b6b;">Ошибка: сервер вернул некорректные данные</p>';
+      return;
+    }
+    
+    if (data.length === 0) {
       container.innerHTML = '<p style="color: #94a3b8; text-align: center;">Нет редакторов</p>';
       return;
     }
     
     let html = '<div class="editors-grid">';
     
-    editors.forEach(editor => {
-      const date = new Date(editor.created_at).toLocaleDateString('ru-RU');
+    data.forEach(editor => {
+      const date = editor.created_at ? new Date(editor.created_at).toLocaleDateString('ru-RU') : 'неизвестно';
       
       html += `
         <div class="editor-card" data-id="${editor.id}" style="
@@ -686,12 +703,6 @@ async function loadEditorsList() {
               <h3 style="color: #4ecdc4; margin-bottom: 10px;">${editor.username}</h3>
               <p><span style="color: #94a3b8;">Email:</span> ${editor.email || 'Не указан'}</p>
               <p><span style="color: #94a3b8;">Создан:</span> ${date}</p>
-              <p><span style="color: #94a3b8;">Пароль:</span> 
-                <span class="password-hidden" onclick="togglePassword(this)" style="cursor: pointer; background: #1a1f30; padding: 3px 10px; border-radius: 4px;">
-                  ••••••••
-                </span>
-                <span class="password-visible" style="display: none;">${editor.password || 'Скрыт'}</span>
-              </p>
             </div>
             <button class="delete-editor" onclick="deleteEditor(${editor.id})" style="margin-left: 15px;">Удалить</button>
           </div>
@@ -703,8 +714,8 @@ async function loadEditorsList() {
     container.innerHTML = html;
     
   } catch (error) {
-    console.error('Ошибка загрузки редакторов:', error);
-    container.innerHTML = '<p style="color: #ff6b6b;">Ошибка загрузки</p>';
+    console.error('❌ Ошибка загрузки редакторов:', error);
+    container.innerHTML = `<p style="color: #ff6b6b;">Ошибка загрузки: ${error.message}</p>`;
   }
 }
 
@@ -723,7 +734,7 @@ window.togglePassword = function(element) {
   }
 };
 
-// Создание редактора (обновленная версия)
+// Создание редактора 
 function openCreateEditorModal() {
   const modalContent = `
     <div class="create-exhibit-form" style="grid-template-columns: 1fr;">
@@ -744,9 +755,9 @@ function openCreateEditorModal() {
       </div>
       
       <div class="form-group">
-        <label>Telegram Chat ID (для отправки данных)</label>
+        <label>Telegram Chat ID (необязательно)</label>
         <input type="text" id="editor-telegram" placeholder="123456789">
-        <small style="color: #94a3b8;">ID чата пользователя в Telegram</small>
+        <small style="color: #94a3b8;">Если не указан, данные не отправляются в Telegram</small>
       </div>
       
       <button class="submit-btn" id="save-editor-btn">👤 Создать редактора</button>
@@ -776,18 +787,23 @@ function openCreateEditorModal() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           username, 
-          password, // Отправляем обычный пароль
-          email, 
-          telegramId 
+          password,
+          email: email || null,
+          telegramId: telegramId || null
         })
       });
       
       const data = await response.json();
       
       if (response.ok) {
-        NotificationManager.show('Редактор создан! Данные отправлены в Telegram.', 'success');
+        NotificationManager.show(
+          data.telegramSent 
+            ? '✅ Редактор создан! Данные отправлены в Telegram.' 
+            : '✅ Редактор создан! (Telegram не отправлен)',
+          'success'
+        );
         modal.close();
-        await loadEditorsList();
+        await loadEditorsList(); // Перезагружаем список
       } else {
         NotificationManager.show(data.error || 'Ошибка создания', 'error');
       }
@@ -1092,48 +1108,24 @@ window.rejectExhibit = async (id) => {
 
 // Удаление редактора
 window.deleteEditor = async (id) => {
-  // Подтверждение удаления редактора
-  const confirmContent = `
-    <div style="text-align: center; padding: 20px;">
-      <div style="font-size: 48px; margin-bottom: 20px;">⚠️</div>
-      <h3 style="color: #ff6b6b; margin-bottom: 15px;">Удаление редактора</h3>
-      <p style="color: #e0e0e0; margin-bottom: 25px;">Вы уверены, что хотите удалить этого редактора?</p>
-      <div style="display: flex; gap: 15px; justify-content: center;">
-        <button class="approve-btn" id="confirm-delete-yes" style="background: #ff6b6b; color: white; border: none; padding: 10px 30px; border-radius: 8px; font-weight: bold; cursor: pointer;">Да, удалить</button>
-        <button class="reject-btn" id="confirm-delete-no" style="background: #4ecdc4; color: #0f172a; border: none; padding: 10px 30px; border-radius: 8px; font-weight: bold; cursor: pointer;">Нет, отмена</button>
-      </div>
-    </div>
-  `;
+  if (!confirm('Вы уверены, что хотите удалить этого редактора?')) return;
   
-  const confirmModal = createModal({
-    title: '⚠️ Подтверждение действия',
-    content: confirmContent,
-    width: '400px'
-  });
-  
-  document.getElementById('confirm-delete-yes').addEventListener('click', async () => {
-    confirmModal.close();
+  try {
+    const response = await fetch(`/api/admin/editors/${id}`, {
+      method: 'DELETE'
+    });
     
-    try {
-      const response = await fetch(`/api/admin/editors/${id}`, {
-        method: 'DELETE'
-      });
-      const data = await response.json();
-      
-      if (response.ok) {
-        NotificationManager.show('Редактор удален', 'success');
-        await loadEditorsList();
-      } else {
-        NotificationManager.show(data.error || 'Ошибка удаления', 'error');
-      }
-    } catch (error) {
-      NotificationManager.show('Ошибка соединения', 'error');
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Ошибка удаления');
     }
-  });
-  
-  document.getElementById('confirm-delete-no').addEventListener('click', () => {
-    confirmModal.close();
-  });
+    
+    NotificationManager.show('Редактор удален', 'success');
+    await loadEditorsList(); // Перезагружаем список
+    
+  } catch (error) {
+    NotificationManager.show(error.message, 'error');
+  }
 };
 
 // Выход из системы

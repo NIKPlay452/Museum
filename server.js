@@ -412,10 +412,15 @@ app.post('/api/admin/reject/:id', authenticateToken, isAdmin, (req, res) => {
 
 // ============= РЕДАКТОРЫ =============
 app.get('/api/admin/editors', authenticateToken, isAdmin, (req, res) => {
-    // Теперь возвращаем больше информации о редакторах
+    console.log('📋 Запрос списка редакторов от:', req.user?.username);
+    
     db.all(`SELECT id, username, email, created_at FROM users WHERE role = 'editor'`, [], (err, rows) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json(rows);
+        if (err) {
+            console.error('❌ Ошибка получения редакторов:', err);
+            return res.status(500).json({ error: err.message });
+        }
+        console.log(`✅ Найдено редакторов: ${rows?.length || 0}`);
+        res.json(rows || []);
     });
 });
 
