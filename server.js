@@ -143,12 +143,19 @@ app.post('/api/login', (req, res) => {
 });
 
 app.post('/api/logout', (req, res) => {
-    res.clearCookie('token');
+    // Очищаем куку на сервере
+    res.clearCookie('token', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/'
+    });
+    
+    // Дополнительно очищаем все возможные куки
+    res.clearCookie('token', { path: '/views' });
+    res.clearCookie('token', { path: '/api' });
+    
     res.json({ success: true });
-});
-
-app.get('/api/me', authenticateToken, (req, res) => {
-    res.json({ user: req.user });
 });
 
 // ============================================================================

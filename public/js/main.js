@@ -14,13 +14,12 @@ const AppCache = {
     }
 };
 
-const CACHE_DURATION = 3000; // 3 секунды для более быстрого обновления
+const CACHE_DURATION = 3000; // 3 секунды
 
 // ============================================================================
 // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
 // ============================================================================
 
-// Форматирование даты
 function formatDate(dateString) {
     if (!dateString) return 'неизвестно';
     try {
@@ -37,7 +36,6 @@ function formatDate(dateString) {
     }
 }
 
-// Генерация пароля
 function generatePassword(length = 8) {
     const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let password = '';
@@ -47,7 +45,6 @@ function generatePassword(length = 8) {
     return password;
 }
 
-// Текст статуса
 function getStatusText(status) {
     const statusMap = {
         'pending_creation': '⏳ На проверке',
@@ -119,11 +116,10 @@ class FileUploader {
         this.onUpload = options.onUpload || (() => {});
         this.accept = options.accept || 'image/*,video/*';
         this.maxSize = options.maxSize || 10 * 1024 * 1024;
-        this.uploadCounter = 0;
     }
     
     generateUniqueId() {
-        return `upload-${Date.now()}-${this.uploadCounter++}`;
+        return `upload-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     }
     
     createUploadArea(containerId, inputName) {
@@ -131,19 +127,20 @@ class FileUploader {
         if (!container) return;
         
         const uniqueId = this.generateUniqueId();
+        const fileInputId = `file-${uniqueId}`;
         const previewId = `preview-${uniqueId}`;
         
         const fileInput = document.createElement('input');
         fileInput.type = 'file';
         fileInput.name = inputName;
-        fileInput.id = `file-${uniqueId}`;
+        fileInput.id = fileInputId;
         fileInput.accept = this.accept;
         fileInput.style.display = 'none';
         
         const uploadArea = document.createElement('div');
         uploadArea.className = 'file-upload-area';
         uploadArea.innerHTML = `
-            <label for="file-${uniqueId}" class="upload-placeholder" style="cursor: pointer; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+            <label for="${fileInputId}" class="upload-placeholder" style="cursor: pointer; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#4ecdc4" stroke-width="2">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                     <polyline points="17 8 12 3 7 8"/>
@@ -204,7 +201,6 @@ class FileUploader {
 function createModal(options = {}) {
     const { title = '', content = '', onClose = () => {}, width = '600px' } = options;
     
-    // Закрываем предыдущие окна
     document.querySelectorAll('.modal-overlay').forEach(m => m.remove());
     
     const overlay = document.createElement('div');
@@ -250,7 +246,6 @@ async function fetchAPI(url, options = {}) {
             ...options
         });
         
-        // Если ответ 401, просто возвращаем ошибку без уведомления
         if (response.status === 401) {
             throw new Error('unauthorized');
         }
@@ -270,7 +265,6 @@ async function fetchAPI(url, options = {}) {
     }
 }
 
-// Запрос с кэшированием
 async function fetchWithCache(url, cacheKey, forceRefresh = false) {
     if (!cacheKey) return fetchAPI(url);
     
@@ -278,6 +272,7 @@ async function fetchWithCache(url, cacheKey, forceRefresh = false) {
     
     if (!forceRefresh && 
         AppCache[cacheKey] && 
+        AppCache.lastFetch && 
         AppCache.lastFetch[cacheKey] && 
         (now - AppCache.lastFetch[cacheKey] < CACHE_DURATION)) {
         return AppCache[cacheKey];
@@ -286,7 +281,9 @@ async function fetchWithCache(url, cacheKey, forceRefresh = false) {
     try {
         const data = await fetchAPI(url);
         AppCache[cacheKey] = data;
-        AppCache.lastFetch[cacheKey] = now;
+        if (AppCache.lastFetch) {
+            AppCache.lastFetch[cacheKey] = now;
+        }
         return data;
     } catch (error) {
         return AppCache[cacheKey] || [];
@@ -294,29 +291,30 @@ async function fetchWithCache(url, cacheKey, forceRefresh = false) {
 }
 
 // ============================================================================
-// ОЧИСТКА КЭША (ПОЛНОСТЬЮ ИСПРАВЛЕННАЯ ВЕРСИЯ)
+// ОЧИСТКА КЭША (АБСОЛЮТНО НАДЕЖНАЯ ВЕРСИЯ)
 // ============================================================================
 
 function clearCache(key = null) {
-    // Если передан конкретный ключ
+    if (!AppCache || !AppCache.lastFetch) return;
+    
     if (key && typeof key === 'string') {
         if (AppCache.hasOwnProperty(key)) {
             AppCache[key] = null;
         }
-        if (AppCache.lastFetch && AppCache.lastFetch.hasOwnProperty(key)) {
+        if (AppCache.lastFetch.hasOwnProperty(key)) {
             AppCache.lastFetch[key] = 0;
         }
         return;
     }
     
-    // Очищаем все кэши, кроме user
+    // Очищаем все кэши
     const cacheKeys = ['exhibits', 'editors', 'applications'];
     cacheKeys.forEach(k => {
         if (AppCache.hasOwnProperty(k)) {
             AppCache[k] = null;
         }
         if (AppCache.lastFetch && AppCache.lastFetch.hasOwnProperty(k)) {
-            AppCache.lastFetch[key] = 0;
+            AppCache.lastFetch[k] = 0;
         }
     });
 }
@@ -388,7 +386,6 @@ document.addEventListener('DOMContentLoaded', () => {
     updateAuthUI();
     window.addEventListener('authChange', updateAuthUI);
     
-    // Защита страниц
     const currentPage = window.location.pathname;
     if (currentPage.includes('admin-panel.html')) {
         fetchAPI('/api/me').catch(() => {
@@ -398,7 +395,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ============================================================================
-// ЭКСПОРТ ГЛОБАЛЬНЫХ ФУНКЦИЙ
+// ЭКСПОРТ
 // ============================================================================
 
 window.NotificationManager = NotificationManager;

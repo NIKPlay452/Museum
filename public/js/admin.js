@@ -1207,7 +1207,7 @@ window.rejectExhibit = async (id) => {
 };
 
 // ============================================================================
-// ВЫХОД (ИСПРАВЛЕННАЯ ВЕРСИЯ)
+// ВЫХОД (ПОЛНОСТЬЮ ПЕРЕПИСАННАЯ ВЕРСИЯ)
 // ============================================================================
 
 async function logout() {
@@ -1232,44 +1232,58 @@ async function logout() {
         confirmModal.close();
         
         try {
-            // Отправляем запрос на выход
+            // 1. Отправляем запрос на выход
             const response = await fetch('/api/logout', { 
                 method: 'POST', 
                 credentials: 'include' 
             });
             
             if (!response.ok) {
-                throw new Error('Ошибка при выходе');
+                console.warn('Ответ сервера не OK, но продолжаем');
             }
             
-            NotificationManager.show('Выход выполнен', 'info');
+            // 2. Принудительно очищаем куки на клиенте
+            document.cookie.split(";").forEach(c => {
+                document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+            });
             
-            // Очищаем кэш
+            // 3. Очищаем localStorage и sessionStorage
+            try {
+                localStorage.clear();
+                sessionStorage.clear();
+            } catch (e) {
+                console.warn('Ошибка очистки storage:', e);
+            }
+            
+            // 4. Очищаем кэш приложения
             if (window.clearCache) {
                 window.clearCache();
             }
             
-            // Очищаем локальные данные
+            // 5. Обновляем состояние
             AppCache.user = null;
             
-            // Обновляем UI на всех страницах
+            // 6. Обновляем UI
             window.dispatchEvent(new Event('authChange'));
-            
-            // Принудительно обновляем кнопку на главной
             if (window.updateAuthUI) {
                 window.updateAuthUI();
             }
             
-            // Перенаправляем на главную
-            window.location.href = '/views/index.html';
+            // 7. Перенаправляем с полной перезагрузкой
+            NotificationManager.show('Выход выполнен', 'info');
+            
+            // Используем location.replace для полной очистки истории
+            setTimeout(() => {
+                window.location.replace('/views/index.html');
+            }, 500);
             
         } catch (error) {
             console.error('Ошибка при выходе:', error);
             NotificationManager.show('Ошибка при выходе', 'error');
             
-            // Даже при ошибке пытаемся перенаправить
+            // Даже при ошибке пытаемся выйти
             setTimeout(() => {
-                window.location.href = '/views/index.html';
+                window.location.replace('/views/index.html');
             }, 1000);
         }
     });
