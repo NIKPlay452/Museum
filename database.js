@@ -1,17 +1,33 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const fs = require('fs');
 
-const dbPath = path.resolve(__dirname, 'museum.db');
+// Определяем путь к базе данных в зависимости от окружения
+const isVercel = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
+const dbPath = isVercel 
+    ? path.join('/tmp', 'museum.db')           // Vercel: временная папка
+    : path.join(__dirname, 'museum.db');       // Локально: папка проекта
+
+console.log(`📁 Используется БД: ${dbPath} (${isVercel ? 'Vercel' : 'локально'})`);
+
+// Убедимся, что папка существует (для локальной разработки)
+if (!isVercel) {
+    const dbDir = path.dirname(dbPath);
+    if (!fs.existsSync(dbDir)) {
+        fs.mkdirSync(dbDir, { recursive: true });
+    }
+}
 
 const db = new sqlite3.Database(dbPath, (err) => {
     if (err) {
-        console.error('Ошибка подключения к БД:', err.message);
+        console.error('❌ Ошибка подключения к БД:', err.message);
     } else {
-        console.log('Подключено к SQLite базе.');
+        console.log('✅ Подключено к SQLite базе.');
         initTables();
     }
 });
 
+// Остальная часть database.js без изменений
 function initTables() {
     db.serialize(() => {
         db.run(`CREATE TABLE IF NOT EXISTS users (
@@ -49,7 +65,7 @@ function initTables() {
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )`);
 
-        console.log('Таблицы созданы/проверены.');
+        console.log('✅ Таблицы созданы/проверены.');
         
         createDefaultAdmin();
     });
@@ -70,9 +86,9 @@ function createDefaultAdmin() {
                 ['admin', hash, 'admin'],
                 function(err) {
                     if (err) {
-                        console.error('Не удалось создать админа:', err);
+                        console.error('❌ Не удалось создать админа:', err);
                     } else {
-                        console.log('Создан пользователь admin с паролем admin123 (хэширован)');
+                        console.log('✅ Создан пользователь admin с паролем admin123');
                     }
                 }
             );

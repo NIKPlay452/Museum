@@ -402,6 +402,11 @@ app.post('/api/admin/applications/:id/reject', authenticateToken, isAdmin, (req,
 app.get('/api/test', (req, res) => {
     res.json({ message: 'Сервер работает', time: new Date().toISOString() });
 });
+// Логирование всех запросов для отладки
+app.use((req, res, next) => {
+    console.log(`📨 ${req.method} ${req.url}`);
+    next();
+});
 
 // ============= ЗАПУСК =============
 app.listen(PORT, () => {
