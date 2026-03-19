@@ -31,31 +31,44 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// Middleware
+// ========== ЛОГИРОВАНИЕ (ДОЛЖНО БЫТЬ ПЕРВЫМ) ==========
+app.use((req, res, next) => {
+    console.log(`📨 ${req.method} ${req.url}`);
+    next();
+});
+
+// ========== MIDDLEWARE ==========
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// ========== СТАТИЧЕСКИЕ ФАЙЛЫ ==========
-// MIME-типы
-express.static.mime.define({
-  'text/css': ['css'],
-  'application/javascript': ['js'],
-  'image/png': ['png'],
-  'image/jpeg': ['jpg', 'jpeg'],
-  'image/svg+xml': ['svg']
-});
+// ========== СТАТИЧЕСКИЕ ФАЙЛЫ (САМОЕ ВАЖНОЕ!) ==========
+// Явно указываем пути к статическим файлам с правильными заголовками
+app.use('/css', express.static(path.join(__dirname, 'public', 'css'), {
+    setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.css')) {
+            res.setHeader('Content-Type', 'text/css');
+        }
+    }
+}));
 
-// Раздаем статические файлы из папок
-app.use(express.static('public'));
-app.use('/views', express.static('views'));
+app.use('/js', express.static(path.join(__dirname, 'public', 'js'), {
+    setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.js')) {
+            res.setHeader('Content-Type', 'application/javascript');
+        }
+    }
+}));
 
-// Корневой маршрут
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/views', express.static(path.join(__dirname, 'views')));
+
+// ========== КОРНЕВОЙ МАРШРУТ ==========
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'views', 'index.html'));
 });
 
-// Middleware для проверки JWT
+// ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
 const authenticateToken = (req, res, next) => {
     const token = req.cookies.token || req.headers['authorization']?.split(' ')[1];
     
@@ -398,14 +411,9 @@ app.post('/api/admin/applications/:id/reject', authenticateToken, isAdmin, (req,
     });
 });
 
-// Тестовый маршрут
+// ============= ТЕСТОВЫЙ МАРШРУТ =============
 app.get('/api/test', (req, res) => {
     res.json({ message: 'Сервер работает', time: new Date().toISOString() });
-});
-// Логирование всех запросов для отладки
-app.use((req, res, next) => {
-    console.log(`📨 ${req.method} ${req.url}`);
-    next();
 });
 
 // ============= ЗАПУСК =============
