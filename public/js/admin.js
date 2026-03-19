@@ -1207,35 +1207,53 @@ window.rejectExhibit = async (id) => {
 };
 
 // ============================================================================
-// ВЫХОД 
+// ВЫХОД (МАКСИМАЛЬНО ПРОСТАЯ И НАДЕЖНАЯ ВЕРСИЯ)
 // ============================================================================
 
 async function logout() {
-    // Простое подтверждение
-    if (!confirm('Вы уверены, что хотите выйти?')) {
-        return;
-    }
+    // Простое модальное окно подтверждения
+    const confirmContent = `
+        <div style="text-align: center; padding: 20px;">
+            <div style="font-size: 48px; margin-bottom: 20px;">👋</div>
+            <h3 style="color: #4ecdc4; margin-bottom: 20px;">Выход из системы</h3>
+            <p style="color: #e0e0e0; margin-bottom: 25px;">Вы уверены, что хотите выйти?</p>
+            <div style="display: flex; gap: 15px; justify-content: center;">
+                <button class="approve-btn" id="confirm-logout-yes" style="background: #4ecdc4; color: #0f172a; padding: 10px 30px;">Да, выйти</button>
+                <button class="reject-btn" id="confirm-logout-no" style="background: #ff6b6b; color: white; padding: 10px 30px;">Нет, остаться</button>
+            </div>
+        </div>
+    `;
     
-    try {
-        // Пытаемся отправить запрос на выход (но не ждем ответа)
-        fetch('/api/logout', { 
-            method: 'POST', 
-            credentials: 'include',
-            // Игнорируем ответ
-        }).catch(() => {
-            // Игнорируем ошибки
-            console.log('Ошибка при выходе, но продолжаем');
-        });
+    const confirmModal = createModal({
+        title: '⚠️ Подтверждение',
+        content: confirmContent,
+        width: '400px'
+    });
+    
+    document.getElementById('confirm-logout-yes').addEventListener('click', async () => {
+        confirmModal.close();
         
-        // Показываем уведомление
+        try {
+            // Пытаемся выйти через API (не ждем ответа)
+            fetch('/api/logout', { 
+                method: 'POST', 
+                credentials: 'include' 
+            }).catch(() => {});
+            
+        } catch (error) {
+            // Игнорируем ошибки
+        }
+        
+        // Просто перенаправляем на страницу входа в любом случае
         NotificationManager.show('Выход выполнен', 'info');
         
-        // Просто перенаправляем на страницу входа
-        window.location.href = '/views/login.html';
-        
-    } catch (error) {
-        console.error('Ошибка:', error);
-        // Даже при ошибке перенаправляем
-        window.location.href = '/views/login.html';
-    }
+        // Перенаправляем на страницу входа
+        setTimeout(() => {
+            window.location.href = '/views/login.html';
+        }, 500);
+    });
+    
+    document.getElementById('confirm-logout-no').addEventListener('click', () => {
+        confirmModal.close();
+    });
 }
