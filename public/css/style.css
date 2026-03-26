@@ -536,6 +536,9 @@ body {
 }
 
 /* ===== АДМИН-ПАНЕЛЬ ===== */
+.admin-only {
+    display: none;
+}
 .admin-page {
     background: var(--bg-dark);
 }

@@ -48,7 +48,13 @@ function updateUserUI() {
     if (logoutBtn) logoutBtn.style.display = 'inline-block';
     
     if (currentUser.role === 'admin') {
-        document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'block');
+        document.querySelectorAll('.admin-only').forEach(el => {
+            el.style.display = 'flex';
+        });
+    } else {
+        document.querySelectorAll('.admin-only').forEach(el => {
+            el.style.display = 'none';
+        });
     }
 }
 
