@@ -112,8 +112,85 @@ function initTables() {
         // Создаем админа по умолчанию
         createDefaultAdmin();
         
+        // Добавляем тестовую заявку
+        createTestApplication();
+        
         // Добавляем базовые экспонаты, если их нет
         seedExhibitsIfNeeded();
+    });
+}
+
+// ============================================================================
+// СОЗДАНИЕ АДМИНА ПО УМОЛЧАНИЮ
+// ============================================================================
+
+function createDefaultAdmin() {
+    db.get(`SELECT * FROM users WHERE role = 'admin'`, (err, row) => {
+        if (err) {
+            console.error('❌ Ошибка при проверке админа:', err);
+            return;
+        }
+        if (!row) {
+            const bcrypt = require('bcryptjs');
+            const salt = bcrypt.genSaltSync(10);
+            const hash = bcrypt.hashSync('admin123', salt);
+            
+            db.run(`INSERT INTO users (username, password, role) VALUES (?, ?, ?)`,
+                ['admin', hash, 'admin'],
+                function(err) {
+                    if (err) {
+                        console.error('❌ Не удалось создать админа:', err);
+                    } else {
+                        console.log('✅ Создан пользователь admin с паролем admin123');
+                    }
+                }
+            );
+        }
+    });
+}
+
+// ============================================================================
+// СОЗДАНИЕ ТЕСТОВОЙ ЗАЯВКИ
+// ============================================================================
+
+function createTestApplication() {
+    // Проверяем, существует ли уже тестовая заявка
+    db.get(`SELECT * FROM applications WHERE username = 'Nick' AND email = 'Nick@yandex.ru'`, (err, existing) => {
+        if (err) {
+            console.error('❌ Ошибка при проверке тестовой заявки:', err);
+            return;
+        }
+        
+        if (existing) {
+            console.log('ℹ️ Тестовая заявка уже существует, пропускаем создание');
+            return;
+        }
+        
+        // Создаем тестовую заявку
+        db.run(
+            `INSERT INTO applications (full_name, username, email, reason, telegram_chat_id, status) 
+             VALUES (?, ?, ?, ?, ?, 'pending')`,
+            [
+                'Nick Test',           // full_name
+                'Nick',                // username
+                'Nick@yandex.ru',      // email
+                'Хочу стать редактором музея компьютерных технологий, чтобы помогать наполнять сайт информацией о советской и российской компьютерной технике. Интересуюсь историей вычислительной техники, имею опыт работы с архивами и технической документацией.', // reason
+                '999999999999',        // telegram_chat_id
+                'pending'              // status
+            ],
+            function(err) {
+                if (err) {
+                    console.error('❌ Ошибка создания тестовой заявки:', err);
+                } else {
+                    console.log('✅ Тестовая заявка создана!');
+                    console.log('   👤 Имя: Nick Test');
+                    console.log('   🔑 Логин: Nick');
+                    console.log('   📧 Email: Nick@yandex.ru');
+                    console.log('   📱 Telegram ID: 999999999999');
+                    console.log('   📝 Статус: ожидает одобрения');
+                }
+            }
+        );
     });
 }
 
