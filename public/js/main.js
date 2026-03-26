@@ -69,25 +69,16 @@ const NotificationManager = {
         }
         
         const colors = {
-            success: '#4ecdc4',
-            error: '#ff6b6b',
-            info: '#ffe66d'
+            success: '#c9a03d',
+            error: '#e06c75',
+            info: '#5a6e8a'
         };
         
         const notification = document.createElement('div');
         notification.style.cssText = `
             background: ${colors[type]};
-            color: ${type === 'info' ? '#000' : '#fff'};
-            padding: 12px 20px;
-            border-radius: 8px;
-            font-weight: bold;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            animation: slideIn 0.3s ease;
-            cursor: pointer;
-            margin-bottom: 10px;
-            word-break: break-word;
-            font-size: 0.95rem;
-            z-index: 10000;
+            color: ${type === 'info' ? '#fff' : '#0a0c12'};
+            border-left-color: ${colors[type]};
         `;
         notification.textContent = message;
         
@@ -108,7 +99,7 @@ const NotificationManager = {
 };
 
 // ============================================================================
-// ЗАГРУЗЧИК ФАЙЛОВ (ИСПРАВЛЕННАЯ ВЕРСИЯ)
+// ЗАГРУЗЧИК ФАЙЛОВ
 // ============================================================================
 
 class FileUploader {
@@ -129,7 +120,6 @@ class FileUploader {
             return;
         }
         
-        // Очищаем контейнер
         container.innerHTML = '';
         
         const uniqueId = this.generateUniqueId();
@@ -145,32 +135,18 @@ class FileUploader {
         
         const uploadArea = document.createElement('div');
         uploadArea.className = 'file-upload-area';
-        uploadArea.style.cssText = `
-            border: 2px dashed #4ecdc4;
-            border-radius: 10px;
-            padding: 20px;
-            text-align: center;
-            cursor: pointer;
-            min-height: 150px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            background: #0f172a;
-            transition: all 0.3s ease;
-        `;
         
         uploadArea.innerHTML = `
-            <label for="${fileInputId}" style="cursor: pointer; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#4ecdc4" stroke-width="2">
+            <label for="${fileInputId}" class="upload-label">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#c9a03d" stroke-width="2">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                     <polyline points="17 8 12 3 7 8"/>
                     <line x1="12" y1="3" x2="12" y2="15"/>
                 </svg>
-                <p style="color: #e0e0e0; margin: 10px 0 5px;">Нажмите для загрузки</p>
-                <small style="color: #94a3b8;">Макс. 10MB</small>
+                <p>Нажмите для загрузки</p>
+                <small>Макс. 10MB</small>
             </label>
-            <div class="upload-preview" id="${previewId}" style="display: none; width: 100%;"></div>
+            <div class="upload-preview" id="${previewId}" style="display: none;"></div>
         `;
         
         uploadArea.appendChild(fileInput);
@@ -185,12 +161,12 @@ class FileUploader {
             }
             
             const preview = document.getElementById(previewId);
-            const label = uploadArea.querySelector('label');
+            const label = uploadArea.querySelector('.upload-label');
             
             if (file.type.startsWith('image/')) {
                 const reader = new FileReader();
                 reader.onload = (e) => {
-                    preview.innerHTML = `<img src="${e.target.result}" alt="Preview" style="max-width: 100%; max-height: 150px; border-radius: 8px;">`;
+                    preview.innerHTML = `<img src="${e.target.result}" alt="Preview">`;
                     preview.style.display = 'block';
                     label.style.display = 'none';
                 };
@@ -199,9 +175,6 @@ class FileUploader {
                 const video = document.createElement('video');
                 video.src = URL.createObjectURL(file);
                 video.controls = true;
-                video.style.maxWidth = '100%';
-                video.style.maxHeight = '150px';
-                
                 preview.innerHTML = '';
                 preview.appendChild(video);
                 preview.style.display = 'block';
@@ -226,38 +199,14 @@ function createModal(options = {}) {
     
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
-    overlay.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0,0,0,0.95);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 2000;
-        padding: 15px;
-    `;
     
     const modal = document.createElement('div');
     modal.className = 'modal-content';
-    modal.style.cssText = `
-        background: #1e293b;
-        border: 2px solid #4ecdc4;
-        border-radius: 20px;
-        padding: 25px 20px;
-        max-width: 900px;
-        width: 100%;
-        max-height: 90vh;
-        overflow-y: auto;
-        position: relative;
-    `;
-    modal.style.width = width;
+    if (width) modal.style.width = width;
     
     modal.innerHTML = `
-        <button class="modal-close" style="position: absolute; top: 10px; right: 15px; background: none; border: none; color: white; font-size: 2rem; cursor: pointer;">&times;</button>
-        <h2 style="color: #4ecdc4; margin-bottom: 20px; font-size: 1.5rem;">${title}</h2>
+        <button class="modal-close">&times;</button>
+        <h2 style="color: var(--primary); margin-bottom: 1.5rem; font-size: 1.5rem;">${title}</h2>
         <div class="modal-body">${content}</div>
     `;
     

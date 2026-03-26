@@ -7,16 +7,16 @@
 
 :root {
     /* Новая цветовая палитра - строгая, ретро-футуристическая */
-    --primary: #c9a03d;      /* Бронза/золото - акцент */
-    --primary-dark: #b8860b; /* Темная бронза */
-    --secondary: #5a6e8a;    /* Приглушенный синий/сталь */
-    --accent: #e0b354;       /* Светлое золото для акцентов */
-    --bg-dark: #0a0c12;      /* Почти черный, глубокий фон */
-    --bg-card: #12161f;      /* Темно-серый с синеватым отливом */
-    --bg-header: rgba(10, 12, 18, 0.95); /* Почти черный с блюром */
-    --text: #e5e9f0;         /* Светлый, приятный для чтения */
-    --text-muted: #8d9bb0;   /* Приглушенный текст */
-    --border: #2a2f3a;       /* Едва заметная граница */
+    --primary: #c9a03d;
+    --primary-dark: #b8860b;
+    --secondary: #5a6e8a;
+    --accent: #e0b354;
+    --bg-dark: #0a0c12;
+    --bg-card: #12161f;
+    --bg-header: rgba(10, 12, 18, 0.95);
+    --text: #e5e9f0;
+    --text-muted: #8d9bb0;
+    --border: #2a2f3a;
     --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
     --shadow-sm: 0 2px 5px rgba(0, 0, 0, 0.2);
     --shadow-md: 0 5px 15px rgba(0, 0, 0, 0.3);
@@ -35,7 +35,6 @@ body {
     letter-spacing: 0.2px;
 }
 
-/* Фон с аппаратным ускорением и более глубоким эффектом */
 .background-overlay {
     position: fixed;
     top: 0;
@@ -44,7 +43,7 @@ body {
     height: 100%;
     background-size: cover;
     background-position: center;
-    opacity: 0.1; /* Делаем фон более приглушенным */
+    opacity: 0.1;
     filter: blur(0px) brightness(0.7);
     pointer-events: none;
     z-index: -1;
@@ -470,29 +469,29 @@ body {
     letter-spacing: 1px;
 }
 
+/* ===== ОБЩИЕ СТИЛИ ДЛЯ ФОРМ ===== */
 .form-group {
     margin-bottom: 1.5rem;
 }
 
 .form-group label {
-    color: var(--text);
-    font-weight: 500;
-    margin-bottom: 0.5rem;
     display: block;
-    font-size: 0.9rem;
-    letter-spacing: 0.5px;
+    margin-bottom: 0.5rem;
+    color: var(--primary);
+    font-weight: 500;
+    letter-spacing: 0.3px;
 }
 
 .form-group input,
 .form-group textarea,
 .form-group select {
     width: 100%;
-    padding: 0.8rem 1rem;
+    padding: 0.75rem 1rem;
     background: #0a0c12;
     border: 1px solid var(--border);
     border-radius: 12px;
     color: var(--text);
-    font-size: 1rem;
+    font-size: 0.95rem;
     transition: var(--transition);
     font-family: inherit;
 }
@@ -502,28 +501,31 @@ body {
 .form-group select:focus {
     outline: none;
     border-color: var(--primary);
-    box-shadow: 0 0 0 3px rgba(201, 160, 61, 0.2);
+    box-shadow: 0 0 0 3px rgba(201, 160, 61, 0.1);
 }
 
+/* ===== КНОПКИ ===== */
+.submit-btn,
 .login-form button {
     width: 100%;
-    padding: 0.9rem;
+    padding: 0.85rem;
     background: transparent;
     border: 1px solid var(--primary);
-    border-radius: 30px;
+    border-radius: 40px;
     color: var(--primary);
-    font-size: 1rem;
     font-weight: 600;
+    font-size: 1rem;
     cursor: pointer;
     transition: var(--transition);
     margin-top: 0.5rem;
 }
 
+.submit-btn:hover,
 .login-form button:hover {
     background: var(--primary);
     color: var(--bg-dark);
-    box-shadow: var(--glow);
     transform: translateY(-2px);
+    box-shadow: var(--glow);
 }
 
 .error-message {
@@ -600,8 +602,10 @@ body {
     background-size: 16px;
 }
 
-.admin-select:hover {
+.admin-select:hover,
+.admin-select:focus {
     border-color: var(--primary);
+    outline: none;
 }
 
 /* ===== МОДАЛЬНЫЕ ОКНА ===== */
@@ -632,17 +636,17 @@ body {
     overflow-y: auto;
     position: relative;
     box-shadow: var(--shadow-lg);
-    animation: scaleIn 0.3s cubic-bezier(0.34, 1.2, 0.64, 1);
+    animation: modalSlideIn 0.3s cubic-bezier(0.34, 1.2, 0.64, 1);
 }
 
-@keyframes scaleIn {
+@keyframes modalSlideIn {
     from {
         opacity: 0;
-        transform: scale(0.95);
+        transform: translateY(-20px);
     }
     to {
         opacity: 1;
-        transform: scale(1);
+        transform: translateY(0);
     }
 }
 
@@ -656,6 +660,7 @@ body {
     font-size: 2rem;
     cursor: pointer;
     transition: var(--transition);
+    line-height: 1;
 }
 
 .modal-close:hover {
@@ -663,7 +668,181 @@ body {
     transform: rotate(90deg);
 }
 
-/* ===== ФОРМА СОЗДАНИЯ ЭКСПОНАТА ===== */
+.modal-body {
+    color: var(--text);
+}
+
+.modal-body .form-group {
+    margin-bottom: 1.5rem;
+}
+
+.modal-body .form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--primary);
+    font-weight: 500;
+}
+
+.modal-body .submit-btn {
+    width: 100%;
+    margin-top: 0.5rem;
+}
+
+/* Карточки в модальных окнах */
+.modal-body .exhibit-card,
+.modal-body .editor-card,
+.application-card {
+    background: #0a0c12;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 0.8rem;
+    transition: var(--transition);
+}
+
+.modal-body .exhibit-card:hover,
+.modal-body .editor-card:hover,
+.application-card:hover {
+    border-color: var(--primary);
+    transform: translateX(5px);
+}
+
+.modal-body .exhibit-card h4,
+.modal-body .editor-card h3 {
+    color: var(--primary);
+    margin-bottom: 0.5rem;
+    font-size: 1rem;
+}
+
+.modal-body .exhibit-card .meta,
+.modal-body .editor-card p,
+.application-card p {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin: 0.3rem 0;
+}
+
+.modal-body .exhibit-card .description {
+    color: var(--text);
+    font-size: 0.9rem;
+    line-height: 1.5;
+    margin: 0.5rem 0;
+}
+
+/* Кнопки в модальных окнах */
+.modal-body .approve-btn,
+.modal-body .reject-btn,
+.modal-body .delete-editor {
+    padding: 0.5rem 1.2rem;
+    border: none;
+    border-radius: 30px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    font-size: 0.85rem;
+    background: transparent;
+}
+
+.modal-body .approve-btn {
+    border: 1px solid var(--primary);
+    color: var(--primary);
+}
+
+.modal-body .approve-btn:hover {
+    background: var(--primary);
+    color: var(--bg-dark);
+    transform: translateY(-1px);
+}
+
+.modal-body .reject-btn,
+.modal-body .delete-editor {
+    border: 1px solid #e06c75;
+    color: #e06c75;
+}
+
+.modal-body .reject-btn:hover,
+.modal-body .delete-editor:hover {
+    background: #e06c75;
+    color: var(--bg-dark);
+    transform: translateY(-1px);
+}
+
+/* Списки в модальных окнах */
+.modal-body .editors-list,
+.modal-body .applications-list,
+.modal-body .pending-list {
+    max-height: 500px;
+    overflow-y: auto;
+    padding-right: 0.5rem;
+}
+
+.modal-body .editors-list::-webkit-scrollbar,
+.modal-body .applications-list::-webkit-scrollbar,
+.modal-body .pending-list::-webkit-scrollbar {
+    width: 4px;
+}
+
+.modal-body .editors-list::-webkit-scrollbar-track,
+.modal-body .applications-list::-webkit-scrollbar-track,
+.modal-body .pending-list::-webkit-scrollbar-track {
+    background: var(--bg-dark);
+}
+
+.modal-body .editors-list::-webkit-scrollbar-thumb,
+.modal-body .applications-list::-webkit-scrollbar-thumb,
+.modal-body .pending-list::-webkit-scrollbar-thumb {
+    background: var(--primary);
+    border-radius: 2px;
+}
+
+/* Кнопка создания редактора в модалке */
+.modal-body #create-editor-btn {
+    width: 100%;
+    padding: 0.75rem;
+    background: transparent;
+    border: 1px solid var(--primary);
+    border-radius: 40px;
+    color: var(--primary);
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    margin-bottom: 1rem;
+}
+
+.modal-body #create-editor-btn:hover {
+    background: var(--primary);
+    color: var(--bg-dark);
+    transform: translateY(-2px);
+    box-shadow: var(--glow);
+}
+
+/* Контейнер сравнения экспонатов */
+.modal-body .compare-container {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 1rem;
+    align-items: center;
+    margin: 1rem 0;
+}
+
+@media (max-width: 768px) {
+    .modal-body .compare-container {
+        grid-template-columns: 1fr;
+        gap: 0.8rem;
+    }
+    
+    .modal-body .compare-arrow {
+        transform: rotate(90deg);
+        text-align: center;
+    }
+}
+
+.modal-body .compare-arrow {
+    font-size: 1.8rem;
+    color: var(--primary);
+}
+
+/* Форма создания экспоната */
 .create-exhibit-form {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -678,19 +857,45 @@ body {
     }
 }
 
+.form-actions {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.delete-btn {
+    flex: 1;
+    padding: 0.85rem;
+    background: transparent;
+    border: 1px solid #e06c75;
+    border-radius: 40px;
+    color: #e06c75;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.delete-btn:hover {
+    background: #e06c75;
+    color: var(--bg-dark);
+    transform: translateY(-2px);
+}
+
+/* Загрузка файлов */
 .file-upload-area {
     border: 2px dashed var(--border);
-    border-radius: 16px;
-    padding: 1.5rem;
+    border-radius: 12px;
+    padding: 1rem;
     text-align: center;
     cursor: pointer;
     transition: var(--transition);
-    min-height: 150px;
+    background: #0a0c12;
+    min-height: 120px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    background: #0a0c12;
 }
 
 .file-upload-area:hover {
@@ -698,126 +903,60 @@ body {
     background: rgba(201, 160, 61, 0.05);
 }
 
-.submit-btn {
-    grid-column: 1 / -1;
-    padding: 0.8rem;
-    background: transparent;
-    border: 1px solid var(--primary);
-    border-radius: 40px;
-    color: var(--primary);
-    font-weight: 600;
-    font-size: 1rem;
-    cursor: pointer;
-    transition: var(--transition);
+.upload-preview {
     margin-top: 0.5rem;
+    width: 100%;
 }
 
-.submit-btn:hover {
-    background: var(--primary);
-    color: var(--bg-dark);
-    transform: translateY(-2px);
-    box-shadow: var(--glow);
+.upload-preview img,
+.upload-preview video {
+    max-width: 100%;
+    max-height: 150px;
+    border-radius: 8px;
 }
 
-/* ===== СПИСКИ ===== */
-.editors-list,
-.exhibits-list,
-.applications-list {
-    list-style: none;
-    margin: 1rem 0;
-}
-
-.editors-list li,
-.exhibits-list li,
-.application-card {
-    background: #0a0c12;
-    margin: 0.8rem 0;
-    padding: 1rem;
-    border-radius: 12px;
-    border-left: 3px solid var(--primary);
-    transition: var(--transition);
-}
-
-.editors-list li:hover,
-.exhibits-list li:hover,
-.application-card:hover {
-    transform: translateX(5px);
-    background: #12161f;
-}
-
-/* ===== КНОПКИ ===== */
-.approve-btn,
-.reject-btn,
-.delete-editor {
-    padding: 0.4rem 1rem;
-    border: none;
-    border-radius: 30px;
-    font-weight: 600;
+.upload-label {
     cursor: pointer;
-    transition: var(--transition);
-    font-size: 0.85rem;
-}
-
-.approve-btn {
-    background: transparent;
-    border: 1px solid var(--primary);
-    color: var(--primary);
-}
-
-.approve-btn:hover {
-    background: var(--primary);
-    color: var(--bg-dark);
-    transform: translateY(-1px);
-}
-
-.reject-btn,
-.delete-editor {
-    background: transparent;
-    border: 1px solid #e06c75;
-    color: #e06c75;
-}
-
-.reject-btn:hover,
-.delete-editor:hover {
-    background: #e06c75;
-    color: var(--bg-dark);
-    transform: translateY(-1px);
-}
-
-/* ===== СРАВНЕНИЕ ЭКСПОНАТОВ ===== */
-.compare-container {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    gap: 1.5rem;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
     align-items: center;
-    margin: 1.5rem 0;
+    justify-content: center;
 }
 
-@media (max-width: 768px) {
-    .compare-container {
-        grid-template-columns: 1fr;
-        gap: 1rem;
-    }
-    .compare-arrow {
-        transform: rotate(90deg);
-    }
-}
-
-.compare-arrow {
-    font-size: 2rem;
-    color: var(--primary);
-}
-
-.exhibit-card {
-    background: #0a0c12;
-    padding: 1rem;
-    border-radius: 12px;
-    border: 1px solid var(--border);
-}
-
-.exhibit-card h4 {
-    color: var(--primary);
+.upload-label svg {
     margin-bottom: 0.5rem;
+    stroke: var(--primary);
+}
+
+.upload-label p {
+    margin: 0.5rem 0 0.25rem;
+    color: var(--text);
+}
+
+.upload-label small {
+    color: var(--text-muted);
+}
+
+.current-file {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+    padding: 0.3rem 0.5rem;
+    background: rgba(201, 160, 61, 0.1);
+    border-radius: 6px;
+    display: inline-block;
+}
+
+.readonly-input {
+    background: rgba(10, 12, 18, 0.5);
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.editors-header {
+    margin-bottom: 1rem;
 }
 
 /* ===== УВЕДОМЛЕНИЯ ===== */
@@ -888,6 +1027,15 @@ body {
 }
 
 /* ===== АНИМАЦИИ ===== */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
 @keyframes slideIn {
     from {
         transform: translateX(100%);
@@ -907,15 +1055,6 @@ body {
     to {
         transform: translateX(100%);
         opacity: 0;
-    }
-}
-
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-    }
-    to {
-        opacity: 1;
     }
 }
 
@@ -947,6 +1086,10 @@ body {
 
     .user-badge {
         display: none;
+    }
+    
+    .modal-content {
+        padding: 1.5rem;
     }
 }
 

@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         updateUserUI();
         setupAdminButtons();
-        await loadExhibits(true); // Принудительная загрузка при старте
+        await loadExhibits(true);
         setupLogout();
         
     } catch (error) {
@@ -61,7 +61,6 @@ function setupAdminButtons() {
         document.querySelector('[data-action="editors"]').addEventListener('click', openEditorsModal);
         document.querySelector('[data-action="applications"]').addEventListener('click', openApplicationsModal);
         
-        // Принудительная загрузка экспонатов каждые 30 секунд
         setInterval(async () => {
             await loadExhibits(true);
         }, 30000);
@@ -100,7 +99,7 @@ function generateUniqueId(prefix = 'field') {
 }
 
 // ============================================================================
-// СОЗДАНИЕ ЭКСПОНАТА (ИСПРАВЛЕННАЯ ВЕРСИЯ)
+// СОЗДАНИЕ ЭКСПОНАТА
 // ============================================================================
 
 function openCreateModal() {
@@ -109,32 +108,32 @@ function openCreateModal() {
     const descId = generateUniqueId('desc');
     
     const modalContent = `
-        <div class="create-exhibit-form" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        <div class="create-exhibit-form">
             <div class="form-left">
-                <div class="form-group" style="margin-bottom: 15px;">
-                    <label for="${titleId}" style="color: #4ecdc4; display: block; margin-bottom: 5px;">Название *</label>
-                    <input type="text" id="${titleId}" class="exhibit-title" required placeholder="Apple Macintosh" style="width: 100%; padding: 10px; background: #1e293b; border: 1px solid #334155; border-radius: 6px; color: white;">
+                <div class="form-group">
+                    <label for="${titleId}">Название *</label>
+                    <input type="text" id="${titleId}" class="exhibit-title" required placeholder="Apple Macintosh">
                 </div>
-                <div class="form-group" style="margin-bottom: 15px;">
-                    <label for="${yearId}" style="color: #4ecdc4; display: block; margin-bottom: 5px;">Год *</label>
-                    <input type="number" id="${yearId}" class="exhibit-year" required placeholder="1984" style="width: 100%; padding: 10px; background: #1e293b; border: 1px solid #334155; border-radius: 6px; color: white;">
+                <div class="form-group">
+                    <label for="${yearId}">Год *</label>
+                    <input type="number" id="${yearId}" class="exhibit-year" required placeholder="1984">
                 </div>
-                <div class="form-group" style="margin-bottom: 15px;">
-                    <label for="${descId}" style="color: #4ecdc4; display: block; margin-bottom: 5px;">Описание *</label>
-                    <textarea id="${descId}" class="exhibit-description" required placeholder="Описание..." style="width: 100%; padding: 10px; background: #1e293b; border: 1px solid #334155; border-radius: 6px; color: white; min-height: 120px;"></textarea>
+                <div class="form-group">
+                    <label for="${descId}">Описание *</label>
+                    <textarea id="${descId}" class="exhibit-description" required placeholder="Описание..."></textarea>
                 </div>
             </div>
             <div class="form-right">
-                <div class="form-group" style="margin-bottom: 15px;">
-                    <label style="color: #4ecdc4; display: block; margin-bottom: 5px;">Медиафайл *</label>
-                    <div id="media-upload-container" style="width: 100%;"></div>
+                <div class="form-group">
+                    <label>Медиафайл *</label>
+                    <div id="media-upload-container"></div>
                 </div>
-                <div class="form-group" style="margin-bottom: 15px;">
-                    <label style="color: #4ecdc4; display: block; margin-bottom: 5px;">Фон (необязательно)</label>
-                    <div id="background-upload-container" style="width: 100%;"></div>
+                <div class="form-group">
+                    <label>Фон (необязательно)</label>
+                    <div id="background-upload-container"></div>
                 </div>
             </div>
-            <button class="submit-btn" id="create-exhibit-btn" style="grid-column: span 2; padding: 15px; background: linear-gradient(45deg, #4ecdc4, #2a9d8f); border: none; border-radius: 30px; color: white; font-weight: bold; font-size: 1.1rem; cursor: pointer; margin-top: 10px;">✨ Создать</button>
+            <button class="submit-btn" id="create-exhibit-btn">✨ Создать</button>
         </div>
     `;
     
@@ -144,7 +143,6 @@ function openCreateModal() {
         width: '900px'
     });
     
-    // Даем время DOM обновиться
     setTimeout(() => {
         initCreateUploaders();
     }, 100);
@@ -194,37 +192,6 @@ function openCreateModal() {
 }
 
 function initCreateUploaders() {
-    console.log('Инициализация загрузчиков...');
-    
-    const mediaUploader = new FileUploader({
-        onUpload: (file) => console.log('Медиа:', file.name)
-    });
-    
-    const bgUploader = new FileUploader({
-        onUpload: (file) => console.log('Фон:', file.name),
-        accept: 'image/*'
-    });
-    
-    mediaUploader.createUploadArea('media-upload-container', 'media');
-    bgUploader.createUploadArea('background-upload-container', 'background');
-}
-
-// Обновленная функция инициализации загрузчиков
-function initCreateUploaders(mediaContainerId, backgroundContainerId) {
-    const mediaUploader = new FileUploader({
-        onUpload: (file) => console.log('Медиа:', file.name)
-    });
-    
-    const bgUploader = new FileUploader({
-        onUpload: (file) => console.log('Фон:', file.name),
-        accept: 'image/*'
-    });
-    
-    mediaUploader.createUploadArea(mediaContainerId, 'media');
-    bgUploader.createUploadArea(backgroundContainerId, 'background');
-}
-
-function initCreateUploaders() {
     const mediaUploader = new FileUploader({
         onUpload: (file) => console.log('Медиа:', file.name)
     });
@@ -247,7 +214,7 @@ async function openEditModal() {
     
     if (currentUser.role === 'admin') {
         modalContent = `
-            <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+            <div class="edit-mode-selector">
                 <select id="edit-mode-select" class="admin-select">
                     <option value="edit">✏️ Редактировать</option>
                     <option value="pending">⏳ На проверке</option>
@@ -330,10 +297,6 @@ function getExhibitSelectHTML() {
     `;
 }
 
-// ============================================================================
-// ЗАГРУЗКА ЭКСПОНАТА ДЛЯ РЕДАКТИРОВАНИЯ
-// ============================================================================
-
 async function loadExhibitForEdit(exhibitId, containerId) {
     try {
         const response = await fetch(`/api/exhibits/${exhibitId}`);
@@ -378,19 +341,19 @@ function getEditFormHTML(exhibit, titleId, yearId, descId) {
                 <div class="form-group">
                     <label>Медиафайл</label>
                     <div class="edit-media-container"></div>
-                    ${exhibit.media_path ? `<p>Текущий: ${exhibit.media_path.split('/').pop()}</p>` : ''}
+                    ${exhibit.media_path ? `<p class="current-file">Текущий: ${exhibit.media_path.split('/').pop()}</p>` : ''}
                 </div>
                 <div class="form-group">
                     <label>Фон</label>
                     <div class="edit-background-container"></div>
-                    ${exhibit.background_path ? `<p>Текущий: ${exhibit.background_path.split('/').pop()}</p>` : ''}
+                    ${exhibit.background_path ? `<p class="current-file">Текущий: ${exhibit.background_path.split('/').pop()}</p>` : ''}
                 </div>
             </div>
-            <div style="display: flex; gap: 10px; margin-top: 15px;">
+            <div class="form-actions">
                 ${currentUser.role === 'admin' ? `
-                    <button class="submit-btn" id="delete-exhibit-btn" style="background: #ff6b6b; flex: 1;">🗑️ Удалить</button>
+                    <button class="delete-btn" id="delete-exhibit-btn">🗑️ Удалить</button>
                 ` : ''}
-                <button class="submit-btn" id="update-exhibit-btn" style="flex: 2;">💾 Сохранить</button>
+                <button class="submit-btn" id="update-exhibit-btn">💾 Сохранить</button>
             </div>
         </div>
     `;
@@ -455,14 +418,14 @@ function setupEditHandlers(exhibitId, exhibit, titleId, yearId, descId) {
 function setupDeleteHandler(exhibitId, exhibit) {
     document.getElementById('delete-exhibit-btn').addEventListener('click', () => {
         const confirmContent = `
-            <div style="text-align: center; padding: 15px;">
-                <div style="font-size: 40px; margin-bottom: 15px;">⚠️</div>
-                <h3 style="color: #ff6b6b;">Удаление</h3>
+            <div class="confirm-dialog">
+                <div class="confirm-icon">⚠️</div>
+                <h3>Удаление</h3>
                 <p>Удалить "${exhibit.title}" (${exhibit.year})?</p>
-                <p style="color: #94a3b8; font-size: 0.9rem;">Действие необратимо</p>
-                <div style="display: flex; gap: 10px; justify-content: center; margin-top: 15px;">
-                    <button class="approve-btn" id="confirm-delete-yes" style="background: #ff6b6b;">Да</button>
-                    <button class="reject-btn" id="confirm-delete-no" style="background: #4ecdc4;">Нет</button>
+                <p class="confirm-warning">Действие необратимо</p>
+                <div class="confirm-actions">
+                    <button class="approve-btn" id="confirm-delete-yes">Да</button>
+                    <button class="reject-btn" id="confirm-delete-no">Нет</button>
                 </div>
             </div>
         `;
@@ -509,7 +472,7 @@ async function loadPendingCreations(container) {
         const pending = await fetchWithCache('/api/admin/pending-creations', null, true);
         
         if (pending.length === 0) {
-            container.innerHTML = '<p style="color: #94a3b8; text-align: center;">Нет на проверке</p>';
+            container.innerHTML = '<p class="empty-message">Нет экспонатов на проверке</p>';
             return;
         }
         
@@ -521,8 +484,8 @@ async function loadPendingCreations(container) {
                     <h4>${exhibit.title}</h4>
                     <div class="meta">${exhibit.year} | ${exhibit.creator_name || '?'}</div>
                     <div class="description">${exhibit.description}</div>
-                    ${exhibit.media_path ? `<img src="${exhibit.media_path}" style="max-width: 150px;">` : ''}
-                    <div style="display: flex; gap: 10px; margin-top: 10px;">
+                    ${exhibit.media_path ? `<img src="${exhibit.media_path}" class="preview-img">` : ''}
+                    <div class="card-actions">
                         <button class="approve-btn" onclick="approveExhibit(${exhibit.id})">✅ Одобрить</button>
                         <button class="reject-btn" onclick="rejectExhibit(${exhibit.id})">❌ Отклонить</button>
                     </div>
@@ -534,7 +497,7 @@ async function loadPendingCreations(container) {
         container.innerHTML = html;
         
     } catch (error) {
-        container.innerHTML = '<p style="color: #ff6b6b;">Ошибка</p>';
+        container.innerHTML = '<p class="error-message">Ошибка загрузки</p>';
     }
 }
 
@@ -543,7 +506,7 @@ async function loadPendingEdits(container) {
         const pending = await fetchWithCache('/api/admin/pending-edits', null, true);
         
         if (pending.length === 0) {
-            container.innerHTML = '<p style="color: #94a3b8; text-align: center;">Нет изменений</p>';
+            container.innerHTML = '<p class="empty-message">Нет изменений на проверке</p>';
             return;
         }
         
@@ -566,18 +529,18 @@ async function loadPendingEdits(container) {
                         <div class="description">${edit.description}</div>
                     </div>
                 </div>
-                <div style="display: flex; gap: 10px; justify-content: center; margin: 10px 0;">
+                <div class="card-actions">
                     <button class="approve-btn" onclick="approveExhibit(${edit.id})">✅ Одобрить</button>
                     <button class="reject-btn" onclick="rejectExhibit(${edit.id})">❌ Отклонить</button>
                 </div>
-                <hr style="border-color: #334155;">
+                <hr class="separator">
             `;
         }
         
         container.innerHTML = html;
         
     } catch (error) {
-        container.innerHTML = '<p style="color: #ff6b6b;">Ошибка</p>';
+        container.innerHTML = '<p class="error-message">Ошибка загрузки</p>';
     }
 }
 
@@ -587,7 +550,7 @@ async function loadPendingEdits(container) {
 
 async function openStatusModal() {
     const modalContent = `
-        <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+        <div class="status-selector">
             <select id="status-mode-select" class="admin-select">
                 <option value="pending_creation">📝 На проверке</option>
                 <option value="pending_edit">✏️ Изменения</option>
@@ -599,7 +562,7 @@ async function openStatusModal() {
     `;
     
     const modal = createModal({
-        title: '📊 Состояние',
+        title: '📊 Состояние экспонатов',
         content: modalContent,
         width: '800px'
     });
@@ -616,31 +579,31 @@ async function loadStatusList(status, container) {
         const items = await fetchWithCache(`/api/exhibits/status/${status}`, null, true);
         
         if (items.length === 0) {
-            container.innerHTML = '<p style="color: #94a3b8;">Нет экспонатов</p>';
+            container.innerHTML = '<p class="empty-message">Нет экспонатов</p>';
             return;
         }
         
-        let html = '<div class="exhibits-list">';
+        let html = '<ul class="exhibits-list">';
         
         items.forEach(item => {
             const date = formatDate(item.created_at);
             
             html += `
-                <li>
-                    <strong style="color: #4ecdc4;">${item.title}</strong> (${item.year})
+                <li class="status-item">
+                    <strong>${item.title}</strong> (${item.year})
                     <br>
                     <small>${date} | ${item.creator_name || '?'}</small>
                     <br>
-                    <small>${getStatusText(item.status)}</small>
+                    <small class="status-badge">${getStatusText(item.status)}</small>
                 </li>
             `;
         });
         
-        html += '</div>';
+        html += '</ul>';
         container.innerHTML = html;
         
     } catch (error) {
-        container.innerHTML = '<p style="color: #ff6b6b;">Ошибка</p>';
+        container.innerHTML = '<p class="error-message">Ошибка загрузки</p>';
     }
 }
 
@@ -650,14 +613,14 @@ async function loadStatusList(status, container) {
 
 async function openEditorsModal() {
     const modalContent = `
-        <div style="margin-bottom: 15px;">
-            <button class="admin-btn" id="create-editor-btn" style="width: 100%;">➕ Создать редактора</button>
+        <div class="editors-header">
+            <button class="admin-btn" id="create-editor-btn">➕ Создать редактора</button>
         </div>
         <div id="editors-list-container">Загрузка...</div>
     `;
     
     const modal = createModal({
-        title: '👥 Редакторы',
+        title: '👥 Управление редакторами',
         content: modalContent,
         width: '700px'
     });
@@ -670,13 +633,13 @@ async function loadEditorsList(forceRefresh = false) {
     const container = document.getElementById('editors-list-container');
     if (!container) return;
     
-    container.innerHTML = '<p>Загрузка...</p>';
+    container.innerHTML = '<div class="loading-spinner"></div>';
     
     try {
         const editors = await fetchWithCache('/api/admin/editors', 'editors', forceRefresh);
         
         if (!Array.isArray(editors) || editors.length === 0) {
-            container.innerHTML = '<p style="color: #94a3b8;">Нет редакторов</p>';
+            container.innerHTML = '<p class="empty-message">Нет редакторов</p>';
             return;
         }
         
@@ -686,23 +649,21 @@ async function loadEditorsList(forceRefresh = false) {
             const date = editor.created_at ? formatDate(editor.created_at) : '?';
             
             html += `
-                <div class="editor-card" data-id="${editor.id}" style="background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 15px; margin-bottom: 10px;">
-                    <div style="display: flex; justify-content: space-between; align-items: start;">
-                        <div style="flex: 1;">
-                            <h3 style="color: #4ecdc4; margin: 0 0 5px;">${editor.username}</h3>
-                            <p>Email: ${editor.email || '—'}</p>
-                            <p>Создан: ${date}</p>
-                            <p>Пароль: 
-                                <span class="password-hidden" onclick="togglePassword(this, ${editor.id})" style="cursor: pointer; background: #1a1f30; padding: 2px 8px; border-radius: 4px;">
-                                    ••••••••
-                                </span>
-                                <span class="password-visible-${editor.id}" style="display: none;"></span>
-                            </p>
-                        </div>
-                        <div style="display: flex; gap: 5px;">
-                            <button class="admin-btn" onclick="editEditor(${editor.id})" style="padding: 5px 10px;">✏️</button>
-                            <button class="delete-editor" onclick="deleteEditor(${editor.id})" style="padding: 5px 10px;">🗑️</button>
-                        </div>
+                <div class="editor-card" data-id="${editor.id}">
+                    <div class="editor-info">
+                        <h3>${editor.username}</h3>
+                        <p>Email: ${editor.email || '—'}</p>
+                        <p>Создан: ${date}</p>
+                        <p>Пароль: 
+                            <span class="password-hidden" onclick="togglePassword(this, ${editor.id})" style="cursor: pointer;">
+                                ••••••••
+                            </span>
+                            <span class="password-visible-${editor.id}" style="display: none;"></span>
+                        </p>
+                    </div>
+                    <div class="editor-actions">
+                        <button class="admin-btn" onclick="editEditor(${editor.id})">✏️</button>
+                        <button class="delete-editor" onclick="deleteEditor(${editor.id})">🗑️</button>
                     </div>
                 </div>
             `;
@@ -712,13 +673,9 @@ async function loadEditorsList(forceRefresh = false) {
         container.innerHTML = html;
         
     } catch (error) {
-        container.innerHTML = `<p style="color: #ff6b6b;">Ошибка: ${error.message}</p>`;
+        container.innerHTML = `<p class="error-message">Ошибка: ${error.message}</p>`;
     }
 }
-
-// ============================================================================
-// ПОКАЗ ПАРОЛЯ
-// ============================================================================
 
 window.togglePassword = async function(element, editorId) {
     const visibleSpan = document.querySelector(`.password-visible-${editorId}`);
@@ -764,10 +721,6 @@ window.togglePassword = async function(element, editorId) {
     }
 };
 
-// ============================================================================
-// РЕДАКТИРОВАНИЕ РЕДАКТОРА
-// ============================================================================
-
 window.editEditor = async (id) => {
     const editors = await fetchWithCache('/api/admin/editors', 'editors', true);
     const editor = editors.find(e => e.id === id);
@@ -782,7 +735,7 @@ window.editEditor = async (id) => {
     const passwordId = generateUniqueId('edit-password');
     
     const modalContent = `
-        <div class="create-exhibit-form" style="grid-template-columns: 1fr;">
+        <div class="create-exhibit-form">
             <div class="form-group">
                 <label for="${usernameId}">Логин</label>
                 <input type="text" id="${usernameId}" class="edit-username" value="${editor.username}" required>
@@ -800,7 +753,7 @@ window.editEditor = async (id) => {
     `;
     
     const modal = createModal({
-        title: '✏️ Редактирование',
+        title: '✏️ Редактирование редактора',
         content: modalContent,
         width: '450px'
     });
@@ -845,10 +798,6 @@ window.editEditor = async (id) => {
     });
 };
 
-// ============================================================================
-// СОЗДАНИЕ РЕДАКТОРА
-// ============================================================================
-
 function openCreateEditorModal() {
     const usernameId = generateUniqueId('editor-username');
     const passwordId = generateUniqueId('editor-password');
@@ -856,7 +805,7 @@ function openCreateEditorModal() {
     const telegramId = generateUniqueId('editor-telegram');
     
     const modalContent = `
-        <div class="create-exhibit-form" style="grid-template-columns: 1fr;">
+        <div class="create-exhibit-form">
             <div class="form-group">
                 <label for="${usernameId}">Логин *</label>
                 <input type="text" id="${usernameId}" class="editor-username" required placeholder="editor123">
@@ -928,19 +877,15 @@ function openCreateEditorModal() {
     });
 }
 
-// ============================================================================
-// УДАЛЕНИЕ РЕДАКТОРА
-// ============================================================================
-
 window.deleteEditor = async (id) => {
     const confirmContent = `
-        <div style="text-align: center; padding: 15px;">
-            <div style="font-size: 40px;">⚠️</div>
-            <h3 style="color: #ff6b6b;">Удалить редактора?</h3>
+        <div class="confirm-dialog">
+            <div class="confirm-icon">⚠️</div>
+            <h3>Удалить редактора?</h3>
             <p>Это действие необратимо</p>
-            <div style="display: flex; gap: 10px; justify-content: center; margin-top: 15px;">
-                <button class="approve-btn" id="confirm-delete-yes" style="background: #ff6b6b;">Да</button>
-                <button class="reject-btn" id="confirm-delete-no" style="background: #4ecdc4;">Нет</button>
+            <div class="confirm-actions">
+                <button class="approve-btn" id="confirm-delete-yes">Да</button>
+                <button class="reject-btn" id="confirm-delete-no">Нет</button>
             </div>
         </div>
     `;
@@ -986,29 +931,28 @@ async function openApplicationsModal() {
         const applications = await fetchWithCache('/api/admin/applications', 'applications', true);
         
         let content = `
-            <div style="margin-bottom: 15px;">
-                <h3 style="color: #4ecdc4;">Всего: ${applications.length}</h3>
+            <div class="applications-header">
+                <h3>Всего заявок: ${applications.length}</h3>
             </div>
             <div class="applications-list">
         `;
         
         if (applications.length === 0) {
-            content += '<p style="color: #94a3b8;">Нет заявок</p>';
+            content += '<p class="empty-message">Нет заявок</p>';
         } else {
             applications.forEach(app => {
                 const date = formatDate(app.created_at);
-                const statusColor = app.status === 'pending' ? '#ffe66d' : 
-                                   app.status === 'approved' ? '#4ecdc4' : '#ff6b6b';
+                const statusClass = app.status === 'pending' ? 'status-pending' : 
+                                   app.status === 'approved' ? 'status-approved' : 'status-rejected';
+                const statusIcon = app.status === 'pending' ? '⏳' : app.status === 'approved' ? '✅' : '❌';
                 
                 content += `
-                    <div class="application-card" data-id="${app.id}" style="border-left-color: ${statusColor};">
-                        <div style="display: flex; justify-content: space-between;">
+                    <div class="application-card" data-id="${app.id}">
+                        <div class="application-header">
                             <strong>${app.full_name}</strong>
-                            <span style="background: ${statusColor}; color: #0f172a; padding: 2px 8px; border-radius: 12px;">
-                                ${app.status === 'pending' ? '⏳' : app.status === 'approved' ? '✅' : '❌'}
-                            </span>
+                            <span class="status-badge ${statusClass}">${statusIcon}</span>
                         </div>
-                        <div>
+                        <div class="application-details">
                             <p>👤 ${app.username}</p>
                             <p>📧 ${app.email || '—'}</p>
                             <p>📱 ${app.telegram_chat_id || '—'}</p>
@@ -1016,7 +960,7 @@ async function openApplicationsModal() {
                             <p>📅 ${date}</p>
                         </div>
                         ${app.status === 'pending' ? `
-                            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                            <div class="card-actions">
                                 <button class="approve-btn" onclick="openCreateEditorFromApplicationModal(${app.id})">✅ Одобрить</button>
                                 <button class="reject-btn" onclick="rejectApplication(${app.id})">❌ Отклонить</button>
                             </div>
@@ -1029,7 +973,7 @@ async function openApplicationsModal() {
         content += '</div>';
         
         createModal({
-            title: '📨 Заявки',
+            title: '📨 Заявки на редакторство',
             content: content,
             width: '700px'
         });
@@ -1039,19 +983,15 @@ async function openApplicationsModal() {
     }
 }
 
-// ============================================================================
-// СОЗДАНИЕ РЕДАКТОРА ИЗ ЗАЯВКИ
-// ============================================================================
-
 window.openCreateEditorFromApplicationModal = async (id) => {
     const confirmContent = `
-        <div style="text-align: center; padding: 15px;">
-            <div style="font-size: 40px;">✅</div>
-            <h3 style="color: #4ecdc4;">Одобрить заявку?</h3>
-            <p>Будет создан редактор</p>
-            <div style="display: flex; gap: 10px; justify-content: center; margin-top: 15px;">
-                <button class="approve-btn" id="confirm-approve-yes" style="background: #4ecdc4;">Да</button>
-                <button class="reject-btn" id="confirm-approve-no" style="background: #ff6b6b;">Нет</button>
+        <div class="confirm-dialog">
+            <div class="confirm-icon">✅</div>
+            <h3>Одобрить заявку?</h3>
+            <p>Будет создан редактор с данными из заявки</p>
+            <div class="confirm-actions">
+                <button class="approve-btn" id="confirm-approve-yes">Да</button>
+                <button class="reject-btn" id="confirm-approve-no">Нет</button>
             </div>
         </div>
     `;
@@ -1073,30 +1013,30 @@ window.openCreateEditorFromApplicationModal = async (id) => {
             const passwordId = generateUniqueId('editor-password');
             
             const modalContent = `
-                <div class="create-exhibit-form" style="grid-template-columns: 1fr;">
+                <div class="create-exhibit-form">
                     <div class="form-group">
                         <label>Логин</label>
-                        <input type="text" value="${application.username}" readonly style="background: #1a1f30;">
+                        <input type="text" value="${application.username}" readonly class="readonly-input">
                     </div>
                     <div class="form-group">
                         <label for="${passwordId}">Пароль</label>
                         <input type="text" id="${passwordId}" class="editor-password" value="${plainPassword}">
-                        <small>Будет отправлен</small>
+                        <small>Будет отправлен в Telegram</small>
                     </div>
                     <div class="form-group">
                         <label>Telegram ID</label>
-                        <input type="text" value="${application.telegram_chat_id || ''}" readonly>
+                        <input type="text" value="${application.telegram_chat_id || ''}" readonly class="readonly-input">
                     </div>
                     <div class="form-group">
                         <label>Email</label>
-                        <input type="text" value="${application.email || ''}" readonly>
+                        <input type="text" value="${application.email || ''}" readonly class="readonly-input">
                     </div>
-                    <button class="submit-btn" id="save-editor-btn">👤 Создать</button>
+                    <button class="submit-btn" id="save-editor-btn">👤 Создать редактора</button>
                 </div>
             `;
             
             const modal = createModal({
-                title: '➕ Создание из заявки',
+                title: '➕ Создание редактора из заявки',
                 content: modalContent,
                 width: '450px'
             });
@@ -1142,19 +1082,15 @@ window.openCreateEditorFromApplicationModal = async (id) => {
     document.getElementById('confirm-approve-no').addEventListener('click', () => confirmModal.close());
 };
 
-// ============================================================================
-// ОТКЛОНЕНИЕ ЗАЯВКИ
-// ============================================================================
-
 window.rejectApplication = async (id) => {
     const confirmContent = `
-        <div style="text-align: center; padding: 15px;">
-            <div style="font-size: 40px;">❌</div>
-            <h3 style="color: #ff6b6b;">Отклонить заявку?</h3>
+        <div class="confirm-dialog">
+            <div class="confirm-icon">❌</div>
+            <h3>Отклонить заявку?</h3>
             <p>Это действие необратимо</p>
-            <div style="display: flex; gap: 10px; justify-content: center; margin-top: 15px;">
-                <button class="approve-btn" id="confirm-reject-yes" style="background: #ff6b6b;">Да</button>
-                <button class="reject-btn" id="confirm-reject-no" style="background: #4ecdc4;">Нет</button>
+            <div class="confirm-actions">
+                <button class="approve-btn" id="confirm-reject-yes">Да</button>
+                <button class="reject-btn" id="confirm-reject-no">Нет</button>
             </div>
         </div>
     `;
@@ -1238,35 +1174,27 @@ window.rejectExhibit = async (id) => {
 };
 
 // ============================================================================
-// ВЫХОД 
+// ВЫХОД
 // ============================================================================
 
 async function logout() {
-    // Простое подтверждение
     if (!confirm('Вы уверены, что хотите выйти?')) {
         return;
     }
     
     try {
-        // Пытаемся отправить запрос на выход (но не ждем ответа)
         fetch('/api/logout', { 
             method: 'POST', 
             credentials: 'include',
-            // Игнорируем ответ
         }).catch(() => {
-            // Игнорируем ошибки
             console.log('Ошибка при выходе, но продолжаем');
         });
         
-        // Показываем уведомление
         NotificationManager.show('Выход выполнен', 'info');
-        
-        // Просто перенаправляем на страницу входа
         window.location.href = '/views/login.html';
         
     } catch (error) {
         console.error('Ошибка:', error);
-        // Даже при ошибке перенаправляем
         window.location.href = '/views/login.html';
     }
 }
