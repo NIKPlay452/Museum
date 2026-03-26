@@ -291,7 +291,10 @@ app.put('/api/exhibits/:id', authenticateToken, upload.fields([
         let backgroundUrl = oldExhibit.background_path;
         
         try {
-            if (req.files?.media?.[0]) {
+            // Обработка удаления файлов
+            if (req.body.remove_media === 'true') {
+                mediaUrl = null;
+            } else if (req.files?.media?.[0]) {
                 const file = req.files.media[0];
                 const result = await imagekit.upload({
                     file: file.buffer,
@@ -302,7 +305,9 @@ app.put('/api/exhibits/:id', authenticateToken, upload.fields([
                 mediaUrl = result.url;
             }
             
-            if (req.files?.background?.[0]) {
+            if (req.body.remove_background === 'true') {
+                backgroundUrl = null;
+            } else if (req.files?.background?.[0]) {
                 const file = req.files.background[0];
                 const result = await imagekit.upload({
                     file: file.buffer,
@@ -313,6 +318,7 @@ app.put('/api/exhibits/:id', authenticateToken, upload.fields([
                 backgroundUrl = result.url;
             }
             
+            // Админ может редактировать напрямую
             if (req.user.role === 'admin') {
                 db.run(
                     `UPDATE exhibits SET title = ?, year = ?, description = ?, media_path = ?, background_path = ? WHERE id = ?`,
@@ -326,18 +332,43 @@ app.put('/api/exhibits/:id', authenticateToken, upload.fields([
                     }
                 );
             } else {
-                db.run(
-                    `INSERT INTO exhibits (title, year, description, media_path, background_path, status, created_by, original_id) 
-                     VALUES (?, ?, ?, ?, ?, 'pending_edit', ?, ?)`,
-                    [title, year, description, mediaUrl, backgroundUrl, userId, exhibitId],
-                    function(err) {
-                        if (err) {
-                            console.error('❌ Ошибка создания правки:', err);
-                            return res.status(500).json({ error: err.message });
-                        }
-                        res.json({ message: 'Изменения отправлены на проверку' });
+                // Редактор создает правку
+                // Проверяем, есть ли уже pending_edit для этого экспоната
+                db.get(`SELECT id FROM exhibits WHERE original_id = ? AND status = 'pending_edit'`, [exhibitId], (err, existing) => {
+                    if (err) {
+                        console.error('❌ Ошибка проверки существующей правки:', err);
+                        return res.status(500).json({ error: err.message });
                     }
-                );
+                    
+                    if (existing) {
+                        // Обновляем существующую правку
+                        db.run(
+                            `UPDATE exhibits SET title = ?, year = ?, description = ?, media_path = ?, background_path = ? WHERE id = ?`,
+                            [title, year, description, mediaUrl, backgroundUrl, existing.id],
+                            function(err) {
+                                if (err) {
+                                    console.error('❌ Ошибка обновления правки:', err);
+                                    return res.status(500).json({ error: err.message });
+                                }
+                                res.json({ message: 'Изменения обновлены и отправлены на проверку' });
+                            }
+                        );
+                    } else {
+                        // Создаем новую правку
+                        db.run(
+                            `INSERT INTO exhibits (title, year, description, media_path, background_path, status, created_by, original_id) 
+                             VALUES (?, ?, ?, ?, ?, 'pending_edit', ?, ?)`,
+                            [title, year, description, mediaUrl, backgroundUrl, userId, exhibitId],
+                            function(err) {
+                                if (err) {
+                                    console.error('❌ Ошибка создания правки:', err);
+                                    return res.status(500).json({ error: err.message });
+                                }
+                                res.json({ message: 'Изменения отправлены на проверку' });
+                            }
+                        );
+                    }
+                });
             }
         } catch (error) {
             console.error('❌ Ошибка ImageKit:', error);

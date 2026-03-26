@@ -1021,6 +1021,50 @@ body {
     margin-bottom: 1rem;
 }
 
+/* Стили для кнопок управления файлами */
+.upload-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 10px;
+}
+
+.change-file-btn,
+.remove-file-btn {
+    padding: 4px 12px;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 500;
+    transition: var(--transition);
+}
+
+.change-file-btn {
+    background: var(--primary);
+    color: #0a0c12;
+}
+
+.change-file-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--glow);
+}
+
+.remove-file-btn {
+    background: #e06c75;
+    color: #0a0c12;
+}
+
+.remove-file-btn:hover {
+    background: #d62828;
+    transform: translateY(-1px);
+}
+
+/* Стили для области загрузки с выбранным файлом */
+.file-upload-area.has-file .upload-label {
+    display: none;
+}
+
 /* ===== УВЕДОМЛЕНИЯ ===== */
 #notification-container {
     position: fixed;

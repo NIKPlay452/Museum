@@ -459,11 +459,23 @@ function setupEditHandlers(exhibitId, exhibit, titleId, yearId, descId) {
         formData.append('year', year);
         formData.append('description', description);
         
+        // Проверяем, есть ли новые файлы или флаги удаления
         const mediaInput = document.querySelector('input[name="media"]');
         const bgInput = document.querySelector('input[name="background"]');
+        const removeMediaFlag = document.querySelector('input[name="remove_media"]');
+        const removeBgFlag = document.querySelector('input[name="remove_background"]');
         
-        if (mediaInput?.files[0]) formData.append('media', mediaInput.files[0]);
-        if (bgInput?.files[0]) formData.append('background', bgInput.files[0]);
+        if (mediaInput?.files[0]) {
+            formData.append('media', mediaInput.files[0]);
+        } else if (removeMediaFlag && removeMediaFlag.value === 'true') {
+            formData.append('remove_media', 'true');
+        }
+        
+        if (bgInput?.files[0]) {
+            formData.append('background', bgInput.files[0]);
+        } else if (removeBgFlag && removeBgFlag.value === 'true') {
+            formData.append('remove_background', 'true');
+        }
         
         try {
             const response = await fetch(`/api/exhibits/${exhibitId}`, {
@@ -478,6 +490,12 @@ function setupEditHandlers(exhibitId, exhibit, titleId, yearId, descId) {
                 NotificationManager.show(data.message, 'success');
                 clearCache('exhibits');
                 await loadExhibits(true);
+                // Закрываем модальное окно через событие
+                const modal = document.querySelector('.modal-overlay');
+                if (modal) {
+                    const closeBtn = modal.querySelector('.modal-close');
+                    if (closeBtn) closeBtn.click();
+                }
             } else {
                 NotificationManager.show(data.error || 'Ошибка', 'error');
             }
