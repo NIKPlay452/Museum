@@ -927,6 +927,152 @@ body {
     margin-bottom: 0.8rem;
 }
 
+/* Стили для карточек в режиме проверки */
+.pending-card {
+    margin-bottom: 1rem;
+    padding: 1rem;
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.card-header h4 {
+    margin: 0;
+    font-size: 1rem;
+    color: var(--primary);
+}
+
+.year-badge {
+    background: rgba(201, 160, 61, 0.2);
+    padding: 0.2rem 0.6rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    color: var(--accent);
+}
+
+.media-preview-small {
+    margin: 0.8rem 0;
+    max-width: 150px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #0a0c12;
+}
+
+.media-preview-small img {
+    width: 100%;
+    height: auto;
+    max-height: 100px;
+    object-fit: contain;
+    display: block;
+}
+
+/* Стили для сравнения экспонатов */
+.compare-container {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 1rem;
+    margin: 1rem 0;
+}
+
+@media (max-width: 768px) {
+    .compare-container {
+        grid-template-columns: 1fr;
+    }
+    .compare-arrow {
+        transform: rotate(90deg);
+        text-align: center;
+    }
+}
+
+.compare-arrow {
+    font-size: 1.5rem;
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.original-card,
+.edited-card {
+    background: #0a0c12;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem;
+}
+
+.original-card {
+    border-left: 3px solid var(--secondary);
+}
+
+.edited-card {
+    border-left: 3px solid var(--primary);
+}
+
+.media-preview {
+    margin-top: 0.8rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border);
+}
+
+.media-preview label {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-bottom: 0.3rem;
+}
+
+.media-preview img {
+    max-width: 100%;
+    max-height: 120px;
+    object-fit: contain;
+    border-radius: 6px;
+}
+
+.media-preview.changed {
+    background: rgba(201, 160, 61, 0.1);
+    padding: 0.5rem;
+    border-radius: 8px;
+}
+
+.media-preview.unchanged label {
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.no-media {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-style: italic;
+    margin-top: 0.5rem;
+}
+
+.separator {
+    margin: 1rem 0;
+    border-color: var(--border);
+}
+
+.retry-btn {
+    margin-top: 0.5rem;
+    padding: 0.3rem 0.8rem;
+    background: transparent;
+    border: 1px solid var(--primary);
+    border-radius: 20px;
+    color: var(--primary);
+    cursor: pointer;
+    font-size: 0.8rem;
+}
+
+.retry-btn:hover {
+    background: var(--primary);
+    color: var(--bg-dark);
+}
+
 /* Стили для контейнеров загрузки в режиме редактирования */
 .edit-media-container,
 .edit-background-container {

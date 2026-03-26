@@ -591,11 +591,27 @@ function setupDeleteHandler(exhibitId, exhibit) {
 // ЗАГРУЗКА ЭКСПОНАТОВ НА ПРОВЕРКУ
 // ============================================================================
 
+async function fetchWithRetry(url, retries = 3, delay = 1000) {
+    for (let i = 0; i < retries; i++) {
+        try {
+            const response = await fetch(url, { credentials: 'include' });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return await response.json();
+        } catch (error) {
+            console.warn(`Попытка ${i + 1} не удалась:`, error);
+            if (i === retries - 1) throw error;
+            await new Promise(resolve => setTimeout(resolve, delay));
+        }
+    }
+}
+
 async function loadPendingCreations(container) {
     try {
-        const pending = await fetchWithCache('/api/admin/pending-creations', null, true);
+        container.innerHTML = '<div class="loading-spinner"></div>';
         
-        if (pending.length === 0) {
+        const pending = await fetchWithRetry('/api/admin/pending-creations', 2);
+        
+        if (!pending || pending.length === 0) {
             container.innerHTML = '<p class="empty-message">Нет экспонатов на проверке</p>';
             return;
         }
@@ -604,11 +620,18 @@ async function loadPendingCreations(container) {
         
         pending.forEach(exhibit => {
             html += `
-                <div class="exhibit-card" data-id="${exhibit.id}">
-                    <h4>${exhibit.title}</h4>
-                    <div class="meta">${exhibit.year} | ${exhibit.creator_name || '?'}</div>
-                    <div class="description">${exhibit.description}</div>
-                    ${exhibit.media_path ? `<img src="${exhibit.media_path}" class="preview-img">` : ''}
+                <div class="exhibit-card pending-card" data-id="${exhibit.id}">
+                    <div class="card-header">
+                        <h4>${escapeHtml(exhibit.title)}</h4>
+                        <span class="year-badge">${exhibit.year}</span>
+                    </div>
+                    <div class="meta">Автор: ${escapeHtml(exhibit.creator_name || 'Неизвестен')}</div>
+                    <div class="description">${escapeHtml(exhibit.description)}</div>
+                    ${exhibit.media_path ? `
+                        <div class="media-preview-small">
+                            <img src="${exhibit.media_path}" alt="Превью" loading="lazy" onerror="this.style.display='none'">
+                        </div>
+                    ` : ''}
                     <div class="card-actions">
                         <button class="approve-btn" onclick="approveExhibit(${exhibit.id})">✅ Одобрить</button>
                         <button class="reject-btn" onclick="rejectExhibit(${exhibit.id})">❌ Отклонить</button>
@@ -621,8 +644,24 @@ async function loadPendingCreations(container) {
         container.innerHTML = html;
         
     } catch (error) {
-        container.innerHTML = '<p class="error-message">Ошибка загрузки</p>';
+        console.error('Ошибка загрузки:', error);
+        container.innerHTML = `
+            <div class="error-message">
+                <p>❌ Ошибка загрузки</p>
+                <button class="retry-btn" onclick="loadPendingCreations(this.parentElement.parentElement)">🔄 Повторить</button>
+            </div>
+        `;
     }
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 async function loadPendingEdits(container) {
@@ -641,20 +680,52 @@ async function loadPendingEdits(container) {
             
             html += `
                 <div class="compare-container">
-                    <div class="exhibit-card">
-                        <h4>Оригинал</h4>
+                    <div class="exhibit-card original-card">
+                        <h4>📄 Оригинал</h4>
                         <div class="meta">${original.title} (${original.year})</div>
                         <div class="description">${original.description}</div>
+                        ${original.media_path ? `
+                            <div class="media-preview">
+                                <label>Изображение:</label>
+                                <img src="${original.media_path}" alt="Оригинал" loading="lazy" onerror="this.style.display='none'">
+                            </div>
+                        ` : '<p class="no-media">Нет изображения</p>'}
+                        ${original.background_path ? `
+                            <div class="media-preview">
+                                <label>Фон:</label>
+                                <img src="${original.background_path}" alt="Фон оригинала" loading="lazy" onerror="this.style.display='none'">
+                            </div>
+                        ` : ''}
                     </div>
                     <div class="compare-arrow">→</div>
-                    <div class="exhibit-card">
-                        <h4>Изменения</h4>
+                    <div class="exhibit-card edited-card">
+                        <h4>✏️ Изменения</h4>
                         <div class="meta">${edit.title} (${edit.year})</div>
                         <div class="description">${edit.description}</div>
+                        ${edit.media_path && edit.media_path !== original.media_path ? `
+                            <div class="media-preview changed">
+                                <label>🔄 Новое изображение:</label>
+                                <img src="${edit.media_path}" alt="Новое изображение" loading="lazy" onerror="this.style.display='none'">
+                            </div>
+                        ` : edit.media_path ? `
+                            <div class="media-preview unchanged">
+                                <label>✓ Изображение не изменено</label>
+                            </div>
+                        ` : '<p class="no-media">Нет изображения</p>'}
+                        ${edit.background_path && edit.background_path !== original.background_path ? `
+                            <div class="media-preview changed">
+                                <label>🔄 Новый фон:</label>
+                                <img src="${edit.background_path}" alt="Новый фон" loading="lazy" onerror="this.style.display='none'">
+                            </div>
+                        ` : edit.background_path ? `
+                            <div class="media-preview unchanged">
+                                <label>✓ Фон не изменен</label>
+                            </div>
+                        ` : ''}
                     </div>
                 </div>
                 <div class="card-actions">
-                    <button class="approve-btn" onclick="approveExhibit(${edit.id})">✅ Одобрить</button>
+                    <button class="approve-btn" onclick="approveExhibit(${edit.id})">✅ Одобрить изменения</button>
                     <button class="reject-btn" onclick="rejectExhibit(${edit.id})">❌ Отклонить</button>
                 </div>
                 <hr class="separator">
@@ -664,7 +735,8 @@ async function loadPendingEdits(container) {
         container.innerHTML = html;
         
     } catch (error) {
-        container.innerHTML = '<p class="error-message">Ошибка загрузки</p>';
+        console.error('Ошибка загрузки правок:', error);
+        container.innerHTML = '<p class="error-message">Ошибка загрузки изменений</p>';
     }
 }
 
