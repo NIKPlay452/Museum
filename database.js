@@ -154,18 +154,24 @@ function createDefaultAdmin() {
 // ============================================================================
 
 function createTestApplication() {
+    console.log('📝 Проверка наличия заявок...');
+    
+    // Проверяем, есть ли вообще какие-либо заявки
     db.get(`SELECT COUNT(*) as count FROM applications`, (err, row) => {
         if (err) {
             console.error('❌ Ошибка при проверке заявок:', err);
             return;
         }
         
+        console.log(`📊 В базе заявок: ${row.count} шт.`);
+        
+        // Если заявок нет, создаем тестовую
         if (row.count === 0) {
             console.log('📝 База заявок пуста, создаю тестовую заявку...');
             
             db.run(
                 `INSERT INTO applications (full_name, username, email, reason, telegram_chat_id, status) 
-                 VALUES (?, ?, ?, ?, ?, 'pending')`,
+                 VALUES (?, ?, ?, ?, ?, ?)`,
                 [
                     'Nick Test',
                     'Nick',
@@ -177,17 +183,30 @@ function createTestApplication() {
                 function(err) {
                     if (err) {
                         console.error('❌ Ошибка создания тестовой заявки:', err);
+                        console.error('   Сообщение:', err.message);
                     } else {
-                        console.log('✅ Тестовая заявка создана!');
+                        console.log('✅ Тестовая заявка успешно создана!');
                         console.log('   👤 Имя: Nick Test');
                         console.log('   🔑 Логин: Nick');
                         console.log('   📧 Email: Nick@yandex.ru');
                         console.log('   📱 Telegram ID: 999999999999');
+                        console.log('   📝 Статус: pending');
+                        console.log('   🆔 ID заявки:', this.lastID);
                     }
                 }
             );
         } else {
             console.log(`ℹ️ В базе уже есть ${row.count} заявок, тестовая не создается`);
+            
+            // Выводим существующие заявки для отладки
+            db.all(`SELECT id, full_name, username, status FROM applications`, [], (err, rows) => {
+                if (!err && rows) {
+                    console.log('📋 Существующие заявки:');
+                    rows.forEach(row => {
+                        console.log(`   - ID:${row.id} | ${row.full_name} | ${row.username} | ${row.status}`);
+                    });
+                }
+            });
         }
     });
 }
