@@ -885,6 +885,50 @@ body {
     transform: translateY(-2px);
 }
 
+/* Стили для превью текущих файлов при редактировании */
+.current-media-preview {
+    margin-bottom: 15px;
+    padding: 10px;
+    background: #0a0c12;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+}
+
+.current-media-preview img {
+    display: block;
+    margin: 0 auto 10px;
+    max-width: 100%;
+    max-height: 150px;
+    object-fit: contain;
+}
+
+.current-file {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    text-align: center;
+    margin: 0;
+    word-break: break-all;
+}
+
+/* Стили для контейнеров загрузки в режиме редактирования */
+.edit-media-container,
+.edit-background-container {
+    margin-top: 5px;
+}
+
+.edit-media-container .file-upload-area,
+.edit-background-container .file-upload-area {
+    min-height: 100px;
+    padding: 0.8rem;
+}
+
+small {
+    display: block;
+    margin-top: 5px;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
 /* Загрузка файлов */
 .file-upload-area {
     border: 2px dashed var(--border);

@@ -322,7 +322,8 @@ async function loadExhibitForEdit(exhibitId, containerId) {
         setupEditHandlers(exhibitId, exhibit, titleId, yearId, descId);
         
     } catch (error) {
-        NotificationManager.show('Ошибка загрузки', 'error');
+        NotificationManager.show('Ошибка загрузки экспоната', 'error');
+        console.error(error);
     }
 }
 
@@ -345,21 +346,39 @@ function getEditFormHTML(exhibit, titleId, yearId, descId) {
             </div>
             <div class="form-right">
                 <div class="form-group">
-                    <label>Медиафайл</label>
-                    <div class="edit-media-container"></div>
-                    ${exhibit.media_path ? `<p class="current-file">Текущий: ${exhibit.media_path.split('/').pop()}</p>` : ''}
+                    <label>Текущее изображение</label>
+                    ${exhibit.media_path ? `
+                        <div class="current-media-preview">
+                            <img src="${exhibit.media_path}" alt="Текущее изображение" style="max-width: 100%; max-height: 150px; border-radius: 8px; margin-bottom: 10px;">
+                            <p class="current-file">Текущий файл: ${exhibit.media_path.split('/').pop()}</p>
+                        </div>
+                    ` : '<p class="current-file">Нет изображения</p>'}
                 </div>
                 <div class="form-group">
-                    <label>Фон</label>
+                    <label>Загрузить новое изображение (необязательно)</label>
+                    <div class="edit-media-container"></div>
+                    <small>Оставьте пустым, чтобы сохранить текущее изображение</small>
+                </div>
+                <div class="form-group">
+                    <label>Текущий фон</label>
+                    ${exhibit.background_path ? `
+                        <div class="current-media-preview">
+                            <img src="${exhibit.background_path}" alt="Текущий фон" style="max-width: 100%; max-height: 150px; border-radius: 8px; margin-bottom: 10px;">
+                            <p class="current-file">Текущий файл: ${exhibit.background_path.split('/').pop()}</p>
+                        </div>
+                    ` : '<p class="current-file">Нет фонового изображения</p>'}
+                </div>
+                <div class="form-group">
+                    <label>Загрузить новый фон (необязательно)</label>
                     <div class="edit-background-container"></div>
-                    ${exhibit.background_path ? `<p class="current-file">Текущий: ${exhibit.background_path.split('/').pop()}</p>` : ''}
+                    <small>Оставьте пустым, чтобы сохранить текущий фон</small>
                 </div>
             </div>
             <div class="form-actions">
                 ${currentUser.role === 'admin' ? `
                     <button class="delete-btn" id="delete-exhibit-btn">🗑️ Удалить</button>
                 ` : ''}
-                <button class="submit-btn" id="update-exhibit-btn">💾 Сохранить</button>
+                <button class="submit-btn" id="update-exhibit-btn">💾 Сохранить изменения</button>
             </div>
         </div>
     `;
