@@ -1316,6 +1316,99 @@ body {
     fill: var(--bg-dark);
 }
 
+.fab-button {
+    position: fixed;
+    bottom: 2rem;
+    width: 50px;
+    height: 50px;
+    background: rgba(18, 22, 31, 0.9);
+    backdrop-filter: blur(4px);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow-md);
+    z-index: 1000;
+    transition: var(--transition);
+    border: 1px solid var(--primary);
+    text-decoration: none;
+}
+
+@media (max-width: 768px) {
+    .fab-button {
+        width: 44px;
+        height: 44px;
+        bottom: 1.5rem;
+    }
+}
+
+.fab-button:hover {
+    transform: scale(1.1);
+}
+
+/* Кнопка Telegram */
+.fab-telegram {
+    left: 2rem;
+    background: rgba(18, 22, 31, 0.9);
+}
+
+@media (max-width: 768px) {
+    .fab-telegram {
+        left: 1rem;
+    }
+}
+
+.fab-telegram:hover {
+    background: #0088cc;
+    border-color: #0088cc;
+}
+
+.fab-telegram svg {
+    fill: var(--primary);
+    transition: var(--transition);
+}
+
+.fab-telegram:hover svg {
+    fill: white;
+}
+
+/* Кнопка Яндекс Формы */
+.fab-yandex {
+    left: calc(2rem + 60px);
+    background: rgba(18, 22, 31, 0.9);
+}
+
+@media (max-width: 768px) {
+    .fab-yandex {
+        left: calc(1rem + 54px);
+    }
+}
+
+.fab-yandex:hover {
+    background: #ff3d00;
+    border-color: #ff3d00;
+}
+
+.fab-yandex svg {
+    fill: var(--primary);
+    transition: var(--transition);
+}
+
+.fab-yandex:hover svg {
+    fill: white;
+}
+
+/* Адаптация для очень маленьких экранов */
+@media (max-width: 480px) {
+    .fab-telegram {
+        left: 0.8rem;
+    }
+    
+    .fab-yandex {
+        left: calc(0.8rem + 54px);
+    }
+}
+
 /* ===== АНИМАЦИИ ===== */
 @keyframes fadeIn {
     from {
