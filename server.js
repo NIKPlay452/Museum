@@ -6,6 +6,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
 const ImageKit = require('imagekit');
+const nodemailer = require('nodemailer');
 const db = require('./database');
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -15,6 +16,17 @@ const PORT = process.env.PORT || 3000;
 // ============================================================================
 
 const JWT_SECRET = process.env.JWT_SECRET || 'museum-secret-key-2026';
+
+// Настройка email транспорта
+const emailTransporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.SMTP_PORT) || 587,
+    secure: false,
+    auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+    }
+});
 
 // ImageKit
 const imagekit = new ImageKit({
@@ -93,6 +105,28 @@ const isAdmin = (req, res, next) => {
     else res.status(403).json({ error: 'Доступ запрещен' });
 };
 
+// Функция отправки email
+async function sendEmail(to, subject, html) {
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+        console.log('⚠️ Email не настроен, пропускаем отправку');
+        return false;
+    }
+    
+    try {
+        await emailTransporter.sendMail({
+            from: `"Музей компьютерных технологий" <${process.env.SMTP_USER}>`,
+            to: to,
+            subject: subject,
+            html: html
+        });
+        console.log(`✅ Email отправлен на ${to}`);
+        return true;
+    } catch (error) {
+        console.error('❌ Ошибка отправки email:', error.message);
+        return false;
+    }
+}
+
 // ============================================================================
 // АВТОРИЗАЦИЯ
 // ============================================================================
@@ -149,6 +183,60 @@ app.post('/api/logout', (req, res) => {
 
 app.get('/api/me', authenticateToken, (req, res) => {
     res.json({ user: req.user });
+});
+
+// ============================================================================
+// ЗАЯВКИ (НОВЫЙ ЭНДПОИНТ)
+// ============================================================================
+
+app.post('/api/applications', (req, res) => {
+    const { full_name, username, email, reason } = req.body;
+    
+    if (!full_name || !username || !email || !reason) {
+        return res.status(400).json({ error: 'Заполните все поля' });
+    }
+    
+    // Проверка уникальности логина
+    db.get('SELECT username FROM users WHERE username = ?', [username], (err, existing) => {
+        if (err) {
+            console.error('Ошибка БД:', err);
+            return res.status(500).json({ error: 'Ошибка сервера' });
+        }
+        
+        if (existing) {
+            return res.status(400).json({ error: 'Логин уже занят' });
+        }
+        
+        // Сохраняем заявку
+        db.run(
+            `INSERT INTO applications (full_name, username, email, reason, status) 
+             VALUES (?, ?, ?, ?, 'pending')`,
+            [full_name, username, email, reason],
+            function(err) {
+                if (err) {
+                    console.error('Ошибка сохранения:', err);
+                    return res.status(500).json({ error: 'Ошибка сохранения' });
+                }
+                
+                console.log(`✅ Новая заявка от ${full_name} (${email})`);
+                
+                // Уведомление администратору в Telegram (если настроен)
+                const ADMIN_CHAT_ID = 5231666805;
+                if (process.env.TELEGRAM_BOT_TOKEN) {
+                    try {
+                        const TelegramBot = require('node-telegram-bot-api');
+                        const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN);
+                        bot.sendMessage(
+                            ADMIN_CHAT_ID,
+                            `🔔 Новая заявка!\n\n👤 ${full_name}\n🔑 ${username}\n📧 ${email}\n💬 ${reason}`
+                        ).catch(() => {});
+                    } catch (e) {}
+                }
+                
+                res.json({ success: true, message: 'Заявка отправлена' });
+            }
+        );
+    });
 });
 
 // ============================================================================
@@ -291,10 +379,7 @@ app.put('/api/exhibits/:id', authenticateToken, upload.fields([
         let backgroundUrl = oldExhibit.background_path;
         
         try {
-            // Обработка удаления файлов
-            if (req.body.remove_media === 'true') {
-                mediaUrl = null;
-            } else if (req.files?.media?.[0]) {
+            if (req.files?.media?.[0]) {
                 const file = req.files.media[0];
                 const result = await imagekit.upload({
                     file: file.buffer,
@@ -305,9 +390,7 @@ app.put('/api/exhibits/:id', authenticateToken, upload.fields([
                 mediaUrl = result.url;
             }
             
-            if (req.body.remove_background === 'true') {
-                backgroundUrl = null;
-            } else if (req.files?.background?.[0]) {
+            if (req.files?.background?.[0]) {
                 const file = req.files.background[0];
                 const result = await imagekit.upload({
                     file: file.buffer,
@@ -318,7 +401,6 @@ app.put('/api/exhibits/:id', authenticateToken, upload.fields([
                 backgroundUrl = result.url;
             }
             
-            // Админ может редактировать напрямую
             if (req.user.role === 'admin') {
                 db.run(
                     `UPDATE exhibits SET title = ?, year = ?, description = ?, media_path = ?, background_path = ? WHERE id = ?`,
@@ -332,43 +414,18 @@ app.put('/api/exhibits/:id', authenticateToken, upload.fields([
                     }
                 );
             } else {
-                // Редактор создает правку
-                // Проверяем, есть ли уже pending_edit для этого экспоната
-                db.get(`SELECT id FROM exhibits WHERE original_id = ? AND status = 'pending_edit'`, [exhibitId], (err, existing) => {
-                    if (err) {
-                        console.error('❌ Ошибка проверки существующей правки:', err);
-                        return res.status(500).json({ error: err.message });
+                db.run(
+                    `INSERT INTO exhibits (title, year, description, media_path, background_path, status, created_by, original_id) 
+                     VALUES (?, ?, ?, ?, ?, 'pending_edit', ?, ?)`,
+                    [title, year, description, mediaUrl, backgroundUrl, userId, exhibitId],
+                    function(err) {
+                        if (err) {
+                            console.error('❌ Ошибка создания правки:', err);
+                            return res.status(500).json({ error: err.message });
+                        }
+                        res.json({ message: 'Изменения отправлены на проверку' });
                     }
-                    
-                    if (existing) {
-                        // Обновляем существующую правку
-                        db.run(
-                            `UPDATE exhibits SET title = ?, year = ?, description = ?, media_path = ?, background_path = ? WHERE id = ?`,
-                            [title, year, description, mediaUrl, backgroundUrl, existing.id],
-                            function(err) {
-                                if (err) {
-                                    console.error('❌ Ошибка обновления правки:', err);
-                                    return res.status(500).json({ error: err.message });
-                                }
-                                res.json({ message: 'Изменения обновлены и отправлены на проверку' });
-                            }
-                        );
-                    } else {
-                        // Создаем новую правку
-                        db.run(
-                            `INSERT INTO exhibits (title, year, description, media_path, background_path, status, created_by, original_id) 
-                             VALUES (?, ?, ?, ?, ?, 'pending_edit', ?, ?)`,
-                            [title, year, description, mediaUrl, backgroundUrl, userId, exhibitId],
-                            function(err) {
-                                if (err) {
-                                    console.error('❌ Ошибка создания правки:', err);
-                                    return res.status(500).json({ error: err.message });
-                                }
-                                res.json({ message: 'Изменения отправлены на проверку' });
-                            }
-                        );
-                    }
-                });
+                );
             }
         } catch (error) {
             console.error('❌ Ошибка ImageKit:', error);
@@ -563,16 +620,40 @@ app.post('/api/admin/editors', authenticateToken, isAdmin, async (req, res) => {
                 expires: Date.now() + 24 * 60 * 60 * 1000
             });
             
-            // let telegramSent = false;
-            // if (telegramId?.trim()) {
-            //     try {
-            //         const { sendCredentialsToUser } = require('./telegramBot');
-            //         await sendCredentialsToUser(telegramId, username, password);
-            //         telegramSent = true;
-            //     } catch (e) {
-            //         console.error('❌ Ошибка Telegram:', e.message);
-            //     }
-            // }
+            let telegramSent = false;
+            if (telegramId?.trim()) {
+                try {
+                    const { sendCredentialsToUser } = require('./telegramBot');
+                    await sendCredentialsToUser(telegramId, username, password);
+                    telegramSent = true;
+                } catch (e) {
+                    console.error('❌ Ошибка Telegram:', e.message);
+                }
+            }
+            
+            // Отправка email, если указан
+            let emailSent = false;
+            if (email?.trim()) {
+                const emailHtml = `
+                    <div style="font-family: 'Inter', sans-serif; max-width: 600px; margin: 0 auto; background: #0a0c12; padding: 2rem; border-radius: 24px; border: 1px solid #c9a03d;">
+                        <h1 style="color: #c9a03d; font-family: 'Orbitron', monospace; text-align: center;">🏛️ Музей компьютерных технологий</h1>
+                        <h2 style="color: #e5e9f0; text-align: center;">Ваша заявка одобрена!</h2>
+                        <p style="color: #e5e9f0;">Здравствуйте, <strong>${username}</strong>!</p>
+                        <p style="color: #e5e9f0;">Ваша заявка на редакторство в музее компьютерных технологий была <strong style="color: #c9a03d;">одобрена</strong>.</p>
+                        <div style="background: #12161f; border: 1px solid #2a2f3a; border-radius: 16px; padding: 1.5rem; margin: 1.5rem 0;">
+                            <p style="color: #c9a03d; margin: 0 0 0.5rem 0;"><strong>🔑 Данные для входа:</strong></p>
+                            <p style="color: #e5e9f0; margin: 0.5rem 0;"><strong>Логин:</strong> <code style="background: #0a0c12; padding: 0.2rem 0.5rem; border-radius: 6px;">${username}</code></p>
+                            <p style="color: #e5e9f0; margin: 0.5rem 0;"><strong>Пароль:</strong> <code style="background: #0a0c12; padding: 0.2rem 0.5rem; border-radius: 6px;">${password}</code></p>
+                        </div>
+                        <p style="color: #e5e9f0; text-align: center;">
+                            <a href="${process.env.SITE_URL || 'https://museum-six-umber.vercel.app'}/views/login.html" style="background: transparent; border: 1px solid #c9a03d; color: #c9a03d; padding: 0.8rem 1.5rem; border-radius: 40px; text-decoration: none; display: inline-block; margin-top: 1rem;">🔐 Войти в панель управления</a>
+                        </p>
+                        <p style="color: #8d9bb0; font-size: 0.8rem; text-align: center; margin-top: 2rem;">Рекомендуем сменить пароль после первого входа.</p>
+                    </div>
+                `;
+                
+                emailSent = await sendEmail(email, '✅ Доступ в редакцию музея компьютерных технологий', emailHtml);
+            }
             
             res.json({ 
                 id: editorId,
@@ -580,7 +661,8 @@ app.post('/api/admin/editors', authenticateToken, isAdmin, async (req, res) => {
                 email: email || null,
                 password,
                 telegramSent,
-                message: telegramSent ? 'Редактор создан. Данные отправлены.' : 'Редактор создан.'
+                emailSent,
+                message: `Редактор создан. ${telegramSent ? 'Данные отправлены в Telegram. ' : ''}${emailSent ? 'Письмо отправлено на почту.' : email ? 'Не удалось отправить письмо.' : ''}`
             });
         }
     );
@@ -690,23 +772,84 @@ app.get('/api/admin/applications/:id', authenticateToken, isAdmin, (req, res) =>
 
 app.post('/api/admin/applications/:id/approve', authenticateToken, isAdmin, (req, res) => {
     const applicationId = req.params.id;
-    db.run(`UPDATE applications SET status = 'approved' WHERE id = ?`, [applicationId], function(err) {
-        if (err) {
-            console.error('❌ Ошибка одобрения заявки:', err);
+    
+    // Получаем данные заявки для отправки email
+    db.get(`SELECT * FROM applications WHERE id = ?`, [applicationId], async (err, application) => {
+        if (err || !application) {
+            console.error('❌ Ошибка получения заявки:', err);
             return res.status(500).json({ error: err.message });
         }
-        res.json({ message: 'Заявка одобрена' });
+        
+        // Обновляем статус заявки
+        db.run(`UPDATE applications SET status = 'approved' WHERE id = ?`, [applicationId], async function(err) {
+            if (err) {
+                console.error('❌ Ошибка одобрения заявки:', err);
+                return res.status(500).json({ error: err.message });
+            }
+            
+            // Отправляем email уведомление, если есть email
+            let emailSent = false;
+            if (application.email) {
+                const emailHtml = `
+                    <div style="font-family: 'Inter', sans-serif; max-width: 600px; margin: 0 auto; background: #0a0c12; padding: 2rem; border-radius: 24px; border: 1px solid #c9a03d;">
+                        <h1 style="color: #c9a03d; font-family: 'Orbitron', monospace; text-align: center;">🏛️ Музей компьютерных технологий</h1>
+                        <h2 style="color: #e5e9f0; text-align: center;">Ваша заявка одобрена!</h2>
+                        <p style="color: #e5e9f0;">Здравствуйте, <strong>${application.full_name}</strong>!</p>
+                        <p style="color: #e5e9f0;">Ваша заявка на редакторство в музее компьютерных технологий была <strong style="color: #c9a03d;">одобрена</strong>.</p>
+                        <p style="color: #e5e9f0;">В ближайшее время администратор создаст для вас учетную запись и вы получите доступ к панели управления.</p>
+                        <p style="color: #8d9bb0; font-size: 0.8rem; text-align: center; margin-top: 2rem;">Следите за уведомлениями.</p>
+                    </div>
+                `;
+                
+                emailSent = await sendEmail(application.email, '✅ Ваша заявка одобрена!', emailHtml);
+            }
+            
+            res.json({ 
+                message: `Заявка одобрена${emailSent ? ', уведомление отправлено на почту' : ''}`,
+                emailSent
+            });
+        });
     });
 });
 
 app.post('/api/admin/applications/:id/reject', authenticateToken, isAdmin, (req, res) => {
     const applicationId = req.params.id;
-    db.run(`UPDATE applications SET status = 'rejected' WHERE id = ?`, [applicationId], function(err) {
-        if (err) {
-            console.error('❌ Ошибка отклонения заявки:', err);
+    
+    // Получаем данные заявки для отправки email
+    db.get(`SELECT * FROM applications WHERE id = ?`, [applicationId], async (err, application) => {
+        if (err || !application) {
+            console.error('❌ Ошибка получения заявки:', err);
             return res.status(500).json({ error: err.message });
         }
-        res.json({ message: 'Заявка отклонена' });
+        
+        db.run(`UPDATE applications SET status = 'rejected' WHERE id = ?`, [applicationId], async function(err) {
+            if (err) {
+                console.error('❌ Ошибка отклонения заявки:', err);
+                return res.status(500).json({ error: err.message });
+            }
+            
+            // Отправляем email уведомление об отказе
+            let emailSent = false;
+            if (application.email) {
+                const emailHtml = `
+                    <div style="font-family: 'Inter', sans-serif; max-width: 600px; margin: 0 auto; background: #0a0c12; padding: 2rem; border-radius: 24px; border: 1px solid #c9a03d;">
+                        <h1 style="color: #c9a03d; font-family: 'Orbitron', monospace; text-align: center;">🏛️ Музей компьютерных технологий</h1>
+                        <h2 style="color: #e5e9f0; text-align: center;">Статус вашей заявки</h2>
+                        <p style="color: #e5e9f0;">Здравствуйте, <strong>${application.full_name}</strong>!</p>
+                        <p style="color: #e5e9f0;">К сожалению, ваша заявка на редакторство была <strong style="color: #ff4d4d;">отклонена</strong>.</p>
+                        <p style="color: #e5e9f0;">Если вы считаете, что это ошибка, вы можете отправить новую заявку.</p>
+                        <p style="color: #8d9bb0; font-size: 0.8rem; text-align: center; margin-top: 2rem;">Спасибо за интерес к нашему музею!</p>
+                    </div>
+                `;
+                
+                emailSent = await sendEmail(application.email, '❌ Статус вашей заявки', emailHtml);
+            }
+            
+            res.json({ 
+                message: `Заявка отклонена${emailSent ? ', уведомление отправлено на почту' : ''}`,
+                emailSent
+            });
+        });
     });
 });
 
@@ -723,11 +866,9 @@ app.get('/api/test', (req, res) => {
 // ============================================================================
 
 app.use((req, res) => {
-    // Если запрос начинается с /api, возвращаем JSON с ошибкой
     if (req.url.startsWith('/api/')) {
         res.status(404).json({ error: 'Маршрут не найден' });
     } else {
-        // Для всех остальных запросов возвращаем HTML
         res.status(404).sendFile(path.join(__dirname, 'views', '404.html'));
     }
 });
@@ -754,11 +895,11 @@ app.listen(PORT, () => {
     console.log(`✅ Сервер запущен на порту ${PORT}`);
     console.log(`🌐 Главная: http://localhost:${PORT}/`);
     
-    // try {
-    //     // require('./telegramBot');
-    // } catch (e) {
-    //     console.log('⚠️ Telegram бот не загружен');
-    // }
+    try {
+        require('./telegramBot');
+    } catch (e) {
+        console.log('⚠️ Telegram бот не загружен');
+    }
 });
 
 module.exports = app;
