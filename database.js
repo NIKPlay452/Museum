@@ -154,43 +154,41 @@ function createDefaultAdmin() {
 // ============================================================================
 
 function createTestApplication() {
-    // Проверяем, существует ли уже тестовая заявка
-    db.get(`SELECT * FROM applications WHERE username = 'Nick' AND email = 'Nick@yandex.ru'`, (err, existing) => {
+    db.get(`SELECT COUNT(*) as count FROM applications`, (err, row) => {
         if (err) {
-            console.error('❌ Ошибка при проверке тестовой заявки:', err);
+            console.error('❌ Ошибка при проверке заявок:', err);
             return;
         }
         
-        if (existing) {
-            console.log('ℹ️ Тестовая заявка уже существует, пропускаем создание');
-            return;
-        }
-        
-        // Создаем тестовую заявку
-        db.run(
-            `INSERT INTO applications (full_name, username, email, reason, telegram_chat_id, status) 
-             VALUES (?, ?, ?, ?, ?, 'pending')`,
-            [
-                'Nick Test',           // full_name
-                'Nick',                // username
-                'Nick@yandex.ru',      // email
-                'Хочу стать редактором музея компьютерных технологий, чтобы помогать наполнять сайт информацией о советской и российской компьютерной технике. Интересуюсь историей вычислительной техники, имею опыт работы с архивами и технической документацией.', // reason
-                '999999999999',        // telegram_chat_id
-                'pending'              // status
-            ],
-            function(err) {
-                if (err) {
-                    console.error('❌ Ошибка создания тестовой заявки:', err);
-                } else {
-                    console.log('✅ Тестовая заявка создана!');
-                    console.log('   👤 Имя: Nick Test');
-                    console.log('   🔑 Логин: Nick');
-                    console.log('   📧 Email: Nick@yandex.ru');
-                    console.log('   📱 Telegram ID: 999999999999');
-                    console.log('   📝 Статус: ожидает одобрения');
+        if (row.count === 0) {
+            console.log('📝 База заявок пуста, создаю тестовую заявку...');
+            
+            db.run(
+                `INSERT INTO applications (full_name, username, email, reason, telegram_chat_id, status) 
+                 VALUES (?, ?, ?, ?, ?, 'pending')`,
+                [
+                    'Nick Test',
+                    'Nick',
+                    'Nick@yandex.ru',
+                    'Хочу стать редактором музея компьютерных технологий, чтобы помогать наполнять сайт информацией о советской и российской компьютерной технике. Интересуюсь историей вычислительной техники, имею опыт работы с архивами и технической документацией.',
+                    '999999999999',
+                    'pending'
+                ],
+                function(err) {
+                    if (err) {
+                        console.error('❌ Ошибка создания тестовой заявки:', err);
+                    } else {
+                        console.log('✅ Тестовая заявка создана!');
+                        console.log('   👤 Имя: Nick Test');
+                        console.log('   🔑 Логин: Nick');
+                        console.log('   📧 Email: Nick@yandex.ru');
+                        console.log('   📱 Telegram ID: 999999999999');
+                    }
                 }
-            }
-        );
+            );
+        } else {
+            console.log(`ℹ️ В базе уже есть ${row.count} заявок, тестовая не создается`);
+        }
     });
 }
 
