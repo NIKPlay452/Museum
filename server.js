@@ -563,16 +563,16 @@ app.post('/api/admin/editors', authenticateToken, isAdmin, async (req, res) => {
                 expires: Date.now() + 24 * 60 * 60 * 1000
             });
             
-            let telegramSent = false;
-            if (telegramId?.trim()) {
-                try {
-                    const { sendCredentialsToUser } = require('./telegramBot');
-                    await sendCredentialsToUser(telegramId, username, password);
-                    telegramSent = true;
-                } catch (e) {
-                    console.error('❌ Ошибка Telegram:', e.message);
-                }
-            }
+            // let telegramSent = false;
+            // if (telegramId?.trim()) {
+            //     try {
+            //         const { sendCredentialsToUser } = require('./telegramBot');
+            //         await sendCredentialsToUser(telegramId, username, password);
+            //         telegramSent = true;
+            //     } catch (e) {
+            //         console.error('❌ Ошибка Telegram:', e.message);
+            //     }
+            // }
             
             res.json({ 
                 id: editorId,
@@ -754,11 +754,11 @@ app.listen(PORT, () => {
     console.log(`✅ Сервер запущен на порту ${PORT}`);
     console.log(`🌐 Главная: http://localhost:${PORT}/`);
     
-    try {
-        require('./telegramBot');
-    } catch (e) {
-        console.log('⚠️ Telegram бот не загружен');
-    }
+    // try {
+    //     // require('./telegramBot');
+    // } catch (e) {
+    //     console.log('⚠️ Telegram бот не загружен');
+    // }
 });
 
 module.exports = app;
