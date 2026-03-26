@@ -309,6 +309,11 @@ async function loadExhibitForEdit(exhibitId, containerId) {
         const exhibit = await response.json();
         
         const container = document.getElementById(containerId);
+        if (!container) {
+            console.error('Контейнер не найден:', containerId);
+            return;
+        }
+        
         const titleId = generateUniqueId('edit-title');
         const yearId = generateUniqueId('edit-year');
         const descId = generateUniqueId('edit-desc');
@@ -322,12 +327,51 @@ async function loadExhibitForEdit(exhibitId, containerId) {
         setupEditHandlers(exhibitId, exhibit, titleId, yearId, descId);
         
     } catch (error) {
+        console.error('Ошибка загрузки экспоната:', error);
         NotificationManager.show('Ошибка загрузки экспоната', 'error');
-        console.error(error);
     }
 }
 
 function getEditFormHTML(exhibit, titleId, yearId, descId) {
+    let currentMediaHtml = '';
+    if (exhibit.media_path) {
+        const ext = exhibit.media_path.split('.').pop().toLowerCase();
+        if (['mp4', 'webm', 'ogg'].includes(ext)) {
+            currentMediaHtml = `
+                <div class="current-media-preview">
+                    <label>Текущее видео:</label>
+                    <video controls style="max-width: 100%; max-height: 150px; margin-top: 5px;">
+                        <source src="${exhibit.media_path}" type="video/${ext}">
+                    </video>
+                    <p class="current-file">${exhibit.media_path.split('/').pop()}</p>
+                </div>
+            `;
+        } else {
+            currentMediaHtml = `
+                <div class="current-media-preview">
+                    <label>Текущее изображение:</label>
+                    <img src="${exhibit.media_path}" alt="Текущее изображение" style="max-width: 100%; max-height: 150px; object-fit: contain; margin-top: 5px; border-radius: 8px;">
+                    <p class="current-file">${exhibit.media_path.split('/').pop()}</p>
+                </div>
+            `;
+        }
+    } else {
+        currentMediaHtml = `<p class="no-file">Нет медиафайла</p>`;
+    }
+    
+    let currentBgHtml = '';
+    if (exhibit.background_path) {
+        currentBgHtml = `
+            <div class="current-media-preview">
+                <label>Текущий фон:</label>
+                <img src="${exhibit.background_path}" alt="Текущий фон" style="max-width: 100%; max-height: 150px; object-fit: contain; margin-top: 5px; border-radius: 8px;">
+                <p class="current-file">${exhibit.background_path.split('/').pop()}</p>
+            </div>
+        `;
+    } else {
+        currentBgHtml = `<p class="no-file">Нет фонового изображения</p>`;
+    }
+    
     return `
         <div class="create-exhibit-form">
             <div class="form-left">
@@ -346,37 +390,21 @@ function getEditFormHTML(exhibit, titleId, yearId, descId) {
             </div>
             <div class="form-right">
                 <div class="form-group">
-                    <label>Текущее изображение</label>
-                    ${exhibit.media_path ? `
-                        <div class="current-media-preview">
-                            <img src="${exhibit.media_path}" alt="Текущее изображение" style="max-width: 100%; max-height: 150px; border-radius: 8px; margin-bottom: 10px;">
-                            <p class="current-file">Текущий файл: ${exhibit.media_path.split('/').pop()}</p>
-                        </div>
-                    ` : '<p class="current-file">Нет изображения</p>'}
+                    <label>Медиафайл</label>
+                    ${currentMediaHtml}
+                    <div class="edit-media-container" style="margin-top: 10px;"></div>
+                    <small>Загрузите новый файл, чтобы заменить текущий (оставьте пустым, чтобы сохранить текущий)</small>
                 </div>
                 <div class="form-group">
-                    <label>Загрузить новое изображение (необязательно)</label>
-                    <div class="edit-media-container"></div>
-                    <small>Оставьте пустым, чтобы сохранить текущее изображение</small>
-                </div>
-                <div class="form-group">
-                    <label>Текущий фон</label>
-                    ${exhibit.background_path ? `
-                        <div class="current-media-preview">
-                            <img src="${exhibit.background_path}" alt="Текущий фон" style="max-width: 100%; max-height: 150px; border-radius: 8px; margin-bottom: 10px;">
-                            <p class="current-file">Текущий файл: ${exhibit.background_path.split('/').pop()}</p>
-                        </div>
-                    ` : '<p class="current-file">Нет фонового изображения</p>'}
-                </div>
-                <div class="form-group">
-                    <label>Загрузить новый фон (необязательно)</label>
-                    <div class="edit-background-container"></div>
-                    <small>Оставьте пустым, чтобы сохранить текущий фон</small>
+                    <label>Фон</label>
+                    ${currentBgHtml}
+                    <div class="edit-background-container" style="margin-top: 10px;"></div>
+                    <small>Загрузите новое фоновое изображение, чтобы заменить текущее</small>
                 </div>
             </div>
             <div class="form-actions">
                 ${currentUser.role === 'admin' ? `
-                    <button class="delete-btn" id="delete-exhibit-btn">🗑️ Удалить</button>
+                    <button class="delete-btn" id="delete-exhibit-btn">🗑️ Удалить экспонат</button>
                 ` : ''}
                 <button class="submit-btn" id="update-exhibit-btn">💾 Сохранить изменения</button>
             </div>
@@ -385,11 +413,34 @@ function getEditFormHTML(exhibit, titleId, yearId, descId) {
 }
 
 function initEditUploaders() {
-    const mediaUploader = new FileUploader({});
-    const bgUploader = new FileUploader({ accept: 'image/*' });
+    const mediaUploader = new FileUploader({
+        onUpload: (file) => {
+            console.log('Выбран новый медиафайл:', file.name);
+        },
+        accept: 'image/*,video/*'
+    });
     
-    mediaUploader.createUploadArea('edit-media-container', 'media');
-    bgUploader.createUploadArea('edit-background-container', 'background');
+    const bgUploader = new FileUploader({
+        onUpload: (file) => {
+            console.log('Выбран новый фон:', file.name);
+        },
+        accept: 'image/*'
+    });
+    
+    const mediaContainer = document.querySelector('.edit-media-container');
+    const bgContainer = document.querySelector('.edit-background-container');
+    
+    if (mediaContainer) {
+        mediaUploader.createUploadAreaFromContainer(mediaContainer, 'media');
+    } else {
+        console.error('Контейнер .edit-media-container не найден');
+    }
+    
+    if (bgContainer) {
+        bgUploader.createUploadAreaFromContainer(bgContainer, 'background');
+    } else {
+        console.error('Контейнер .edit-background-container не найден');
+    }
 }
 
 function setupEditHandlers(exhibitId, exhibit, titleId, yearId, descId) {

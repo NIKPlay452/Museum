@@ -108,7 +108,78 @@ class FileUploader {
         this.accept = options.accept || 'image/*,video/*';
         this.maxSize = options.maxSize || 10 * 1024 * 1024;
     }
+    createUploadAreaFromContainer(container, inputName) {
+    if (!container) {
+        console.log('Контейнер не найден');
+        return;
+    }
     
+    const existingPreview = container.querySelector('.upload-preview');
+    
+    const uniqueId = this.generateUniqueId();
+    const fileInputId = `file-${uniqueId}`;
+    const previewId = `preview-${uniqueId}`;
+    
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.name = inputName;
+    fileInput.id = fileInputId;
+    fileInput.accept = this.accept;
+    fileInput.style.display = 'none';
+    
+    const uploadArea = document.createElement('div');
+    uploadArea.className = 'file-upload-area';
+    
+    uploadArea.innerHTML = `
+        <label for="${fileInputId}" class="upload-label">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#c9a03d" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            <p>Нажмите для загрузки нового файла</p>
+            <small>Макс. 10MB</small>
+        </label>
+        <div class="upload-preview" id="${previewId}" style="display: none;"></div>
+    `;
+    
+    uploadArea.appendChild(fileInput);
+    
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        if (file.size > this.maxSize) {
+            NotificationManager.show(`Файл слишком большой`, 'error');
+            return;
+        }
+        
+        const preview = document.getElementById(previewId);
+        const label = uploadArea.querySelector('.upload-label');
+        
+        if (file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                preview.innerHTML = `<img src="${e.target.result}" alt="Preview">`;
+                preview.style.display = 'block';
+                label.style.display = 'none';
+            };
+            reader.readAsDataURL(file);
+        } else if (file.type.startsWith('video/')) {
+            const video = document.createElement('video');
+            video.src = URL.createObjectURL(file);
+            video.controls = true;
+            preview.innerHTML = '';
+            preview.appendChild(video);
+            preview.style.display = 'block';
+            label.style.display = 'none';
+        }
+        
+        this.onUpload(file, inputName);
+    });
+    
+    container.appendChild(uploadArea);
+}
     generateUniqueId() {
         return `upload-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     }
