@@ -413,16 +413,26 @@ function getEditFormHTML(exhibit, titleId, yearId, descId) {
 }
 
 function initEditUploaders() {
+    console.log('Инициализация загрузчиков для редактирования...');
+    
     const mediaUploader = new FileUploader({
-        onUpload: (file) => {
-            console.log('Выбран новый медиафайл:', file.name);
+        onUpload: (file, inputName) => {
+            if (file) {
+                console.log('Выбран новый медиафайл:', file.name);
+            } else {
+                console.log('Медиафайл очищен');
+            }
         },
         accept: 'image/*,video/*'
     });
     
     const bgUploader = new FileUploader({
-        onUpload: (file) => {
-            console.log('Выбран новый фон:', file.name);
+        onUpload: (file, inputName) => {
+            if (file) {
+                console.log('Выбран новый фон:', file.name);
+            } else {
+                console.log('Фон очищен');
+            }
         },
         accept: 'image/*'
     });
@@ -432,16 +442,19 @@ function initEditUploaders() {
     
     if (mediaContainer) {
         mediaUploader.createUploadAreaFromContainer(mediaContainer, 'media');
+        console.log('Загрузчик медиа создан');
     } else {
         console.error('Контейнер .edit-media-container не найден');
     }
     
     if (bgContainer) {
         bgUploader.createUploadAreaFromContainer(bgContainer, 'background');
+        console.log('Загрузчик фона создан');
     } else {
         console.error('Контейнер .edit-background-container не найден');
     }
 }
+
 
 function setupEditHandlers(exhibitId, exhibit, titleId, yearId, descId) {
     const updateBtn = document.getElementById('update-exhibit-btn');
@@ -458,6 +471,7 @@ function setupEditHandlers(exhibitId, exhibit, titleId, yearId, descId) {
         }
         
         // Показываем индикатор загрузки
+        const originalText = updateBtn.textContent;
         updateBtn.textContent = '⏳ Сохранение...';
         updateBtn.disabled = true;
         
@@ -466,16 +480,18 @@ function setupEditHandlers(exhibitId, exhibit, titleId, yearId, descId) {
         formData.append('year', year);
         formData.append('description', description);
         
-        // Получаем файлы из загрузчиков
+        // Получаем файлы из загрузчиков - ищем по имени input
         const mediaInput = document.querySelector('input[name="media"]');
         const bgInput = document.querySelector('input[name="background"]');
         
-        // Важно: если файл был выбран, добавляем его, даже если он не изменился
-        if (mediaInput && mediaInput.files && mediaInput.files[0]) {
+        // Добавляем файлы, если они выбраны
+        if (mediaInput && mediaInput.files && mediaInput.files.length > 0 && mediaInput.files[0]) {
+            console.log('Добавляем медиафайл:', mediaInput.files[0].name);
             formData.append('media', mediaInput.files[0]);
         }
         
-        if (bgInput && bgInput.files && bgInput.files[0]) {
+        if (bgInput && bgInput.files && bgInput.files.length > 0 && bgInput.files[0]) {
+            console.log('Добавляем фон:', bgInput.files[0].name);
             formData.append('background', bgInput.files[0]);
         }
         
@@ -501,19 +517,19 @@ function setupEditHandlers(exhibitId, exhibit, titleId, yearId, descId) {
                 const modal = document.querySelector('.modal-overlay');
                 if (modal) modal.remove();
                 
-                // Обновляем страницу, если нужно показать изменения
+                // Обновляем страницу через секунду
                 setTimeout(() => {
                     location.reload();
-                }, 500);
+                }, 1000);
             } else {
                 NotificationManager.show(data.error || 'Ошибка обновления', 'error');
-                updateBtn.textContent = '💾 Сохранить изменения';
+                updateBtn.textContent = originalText;
                 updateBtn.disabled = false;
             }
         } catch (error) {
             console.error('Ошибка:', error);
             NotificationManager.show('Ошибка соединения', 'error');
-            updateBtn.textContent = '💾 Сохранить изменения';
+            updateBtn.textContent = originalText;
             updateBtn.disabled = false;
         }
     });

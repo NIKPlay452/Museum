@@ -107,7 +107,6 @@ class FileUploader {
         this.onUpload = options.onUpload || (() => {});
         this.accept = options.accept || 'image/*,video/*';
         this.maxSize = options.maxSize || 10 * 1024 * 1024;
-        this.currentFile = null;
     }
     
     generateUniqueId() {
@@ -120,115 +119,20 @@ class FileUploader {
             console.log(`Контейнер с ID ${containerId} не найден`);
             return;
         }
-        this._createUploadAreaElement(container, inputName);
+        
+        this._createUploadArea(container, inputName);
     }
     
     createUploadAreaFromContainer(container, inputName) {
-    if (!container) {
-        console.log('Контейнер не найден');
-        return;
-    }
-    
-    container.innerHTML = '';
-    
-    const uniqueId = this.generateUniqueId();
-    const fileInputId = `file-${uniqueId}`;
-    const previewId = `preview-${uniqueId}`;
-    
-    const fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.name = inputName;
-    fileInput.id = fileInputId;
-    fileInput.accept = this.accept;
-    fileInput.style.display = 'none';
-    
-    const uploadArea = document.createElement('div');
-    uploadArea.className = 'file-upload-area';
-    
-    uploadArea.innerHTML = `
-        <label for="${fileInputId}" class="upload-label">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#c9a03d" stroke-width="2">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                <polyline points="17 8 12 3 7 8"/>
-                <line x1="12" y1="3" x2="12" y2="15"/>
-            </svg>
-            <p>Нажмите для выбора файла</p>
-            <small>Макс. 10MB</small>
-        </label>
-        <div class="upload-preview" id="${previewId}" style="display: none;"></div>
-        <button class="clear-file-btn" style="display: none; margin-top: 10px; padding: 5px 10px; background: #e06c75; border: none; border-radius: 20px; color: white; cursor: pointer;">🗑️ Очистить</button>
-    `;
-    
-    uploadArea.appendChild(fileInput);
-    
-    let currentFile = null;
-    const preview = document.getElementById(previewId);
-    const label = uploadArea.querySelector('.upload-label');
-    const clearBtn = uploadArea.querySelector('.clear-file-btn');
-    
-    const updateUIAfterFileSelect = (file) => {
-        currentFile = file;
-        clearBtn.style.display = 'block';
-        
-        if (file.type.startsWith('image/')) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                preview.innerHTML = `
-                    <img src="${e.target.result}" alt="Preview">
-                    <p style="margin-top: 5px; font-size: 0.8rem; color: var(--primary);">${file.name}</p>
-                `;
-                preview.style.display = 'block';
-                label.style.display = 'none';
-            };
-            reader.readAsDataURL(file);
-        } else if (file.type.startsWith('video/')) {
-            const video = document.createElement('video');
-            video.src = URL.createObjectURL(file);
-            video.controls = true;
-            video.style.maxWidth = '100%';
-            video.style.maxHeight = '100px';
-            preview.innerHTML = '';
-            preview.appendChild(video);
-            const fileName = document.createElement('p');
-            fileName.textContent = file.name;
-            fileName.style.marginTop = '5px';
-            fileName.style.fontSize = '0.8rem';
-            fileName.style.color = 'var(--primary)';
-            preview.appendChild(fileName);
-            preview.style.display = 'block';
-            label.style.display = 'none';
-        }
-        
-        this.onUpload(file, inputName);
-    };
-    
-    fileInput.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        
-        if (file.size > this.maxSize) {
-            NotificationManager.show(`Файл слишком большой`, 'error');
-            fileInput.value = '';
+        if (!container) {
+            console.log('Контейнер не найден');
             return;
         }
         
-        updateUIAfterFileSelect(file);
-    });
+        this._createUploadArea(container, inputName);
+    }
     
-    clearBtn.addEventListener('click', () => {
-        currentFile = null;
-        fileInput.value = '';
-        preview.innerHTML = '';
-        preview.style.display = 'none';
-        label.style.display = 'flex';
-        clearBtn.style.display = 'none';
-        this.onUpload(null, inputName);
-    });
-    
-    container.appendChild(uploadArea);
-}
-    
-    _createUploadAreaElement(container, inputName) {
+    _createUploadArea(container, inputName) {
         container.innerHTML = '';
         
         const uniqueId = this.generateUniqueId();
@@ -244,6 +148,7 @@ class FileUploader {
         
         const uploadArea = document.createElement('div');
         uploadArea.className = 'file-upload-area';
+        uploadArea.setAttribute('data-preview-id', previewId);
         
         uploadArea.innerHTML = `
             <label for="${fileInputId}" class="upload-label">
@@ -252,43 +157,53 @@ class FileUploader {
                     <polyline points="17 8 12 3 7 8"/>
                     <line x1="12" y1="3" x2="12" y2="15"/>
                 </svg>
-                <p>Нажмите для загрузки файла</p>
+                <p>Нажмите для выбора файла</p>
                 <small>Макс. 10MB</small>
             </label>
             <div class="upload-preview" id="${previewId}" style="display: none;"></div>
-            <div class="upload-actions" style="display: none; margin-top: 10px; gap: 8px; justify-content: center;">
-                <button type="button" class="change-file-btn" style="padding: 4px 12px; background: var(--primary); border: none; border-radius: 20px; color: #0a0c12; cursor: pointer; font-size: 0.8rem;">📁 Сменить</button>
-                <button type="button" class="remove-file-btn" style="padding: 4px 12px; background: #e06c75; border: none; border-radius: 20px; color: #0a0c12; cursor: pointer; font-size: 0.8rem;">🗑️ Удалить</button>
-            </div>
+            <button class="clear-file-btn" style="display: none; margin-top: 10px; padding: 5px 10px; background: #e06c75; border: none; border-radius: 20px; color: white; cursor: pointer;">🗑️ Очистить</button>
         `;
         
         uploadArea.appendChild(fileInput);
+        container.appendChild(uploadArea);
         
         const preview = document.getElementById(previewId);
         const label = uploadArea.querySelector('.upload-label');
-        const actions = uploadArea.querySelector('.upload-actions');
-        const changeBtn = uploadArea.querySelector('.change-file-btn');
-        const removeBtn = uploadArea.querySelector('.remove-file-btn');
+        const clearBtn = uploadArea.querySelector('.clear-file-btn');
         
-        const updatePreview = (file) => {
-            this.currentFile = file;
+        if (!preview) {
+            console.error('Preview элемент не найден!', previewId);
+            return;
+        }
+        
+        let currentFile = null;
+        
+        const updateUIAfterFileSelect = (file) => {
+            currentFile = file;
+            clearBtn.style.display = 'block';
             
-            if (!file) {
-                preview.style.display = 'none';
-                preview.innerHTML = '';
-                label.style.display = 'flex';
-                actions.style.display = 'none';
-                fileInput.value = '';
-                return;
-            }
+            preview.innerHTML = '';
             
             if (file.type.startsWith('image/')) {
                 const reader = new FileReader();
                 reader.onload = (e) => {
-                    preview.innerHTML = `<img src="${e.target.result}" alt="Preview" style="max-width: 100%; max-height: 150px; border-radius: 8px;">`;
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.alt = 'Preview';
+                    img.style.maxWidth = '100%';
+                    img.style.maxHeight = '150px';
+                    img.style.borderRadius = '8px';
+                    
+                    const fileName = document.createElement('p');
+                    fileName.textContent = file.name;
+                    fileName.style.marginTop = '5px';
+                    fileName.style.fontSize = '0.8rem';
+                    fileName.style.color = 'var(--primary)';
+                    
+                    preview.appendChild(img);
+                    preview.appendChild(fileName);
                     preview.style.display = 'block';
                     label.style.display = 'none';
-                    actions.style.display = 'flex';
                 };
                 reader.readAsDataURL(file);
             } else if (file.type.startsWith('video/')) {
@@ -297,11 +212,17 @@ class FileUploader {
                 video.controls = true;
                 video.style.maxWidth = '100%';
                 video.style.maxHeight = '150px';
-                preview.innerHTML = '';
+                
+                const fileName = document.createElement('p');
+                fileName.textContent = file.name;
+                fileName.style.marginTop = '5px';
+                fileName.style.fontSize = '0.8rem';
+                fileName.style.color = 'var(--primary)';
+                
                 preview.appendChild(video);
+                preview.appendChild(fileName);
                 preview.style.display = 'block';
                 label.style.display = 'none';
-                actions.style.display = 'flex';
             }
             
             this.onUpload(file, inputName);
@@ -317,32 +238,50 @@ class FileUploader {
                 return;
             }
             
-            updatePreview(file);
+            updateUIAfterFileSelect(file);
         });
         
-        if (changeBtn) {
-            changeBtn.addEventListener('click', () => {
-                fileInput.click();
-            });
-        }
+        clearBtn.addEventListener('click', () => {
+            currentFile = null;
+            fileInput.value = '';
+            preview.innerHTML = '';
+            preview.style.display = 'none';
+            label.style.display = 'flex';
+            clearBtn.style.display = 'none';
+            this.onUpload(null, inputName);
+        });
         
-        if (removeBtn) {
-            removeBtn.addEventListener('click', () => {
-                updatePreview(null);
-                const removeFlag = document.createElement('input');
-                removeFlag.type = 'hidden';
-                removeFlag.name = `remove_${inputName}`;
-                removeFlag.value = 'true';
-                uploadArea.appendChild(removeFlag);
-            });
-        }
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = 'var(--primary)';
+            uploadArea.style.background = 'rgba(201, 160, 61, 0.1)';
+        });
         
-        container.appendChild(uploadArea);
-    }
-    
-    setFile(file) {
-        if (this.currentUploadArea) {
-        }
+        uploadArea.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = 'var(--border)';
+            uploadArea.style.background = '#0a0c12';
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = 'var(--border)';
+            uploadArea.style.background = '#0a0c12';
+            
+            const file = e.dataTransfer.files[0];
+            if (!file) return;
+            
+            if (file.size > this.maxSize) {
+                NotificationManager.show(`Файл слишком большой (макс. ${this.maxSize / 1024 / 1024}MB)`, 'error');
+                return;
+            }
+            
+            const dataTransfer = new DataTransfer();
+            dataTransfer.items.add(file);
+            fileInput.files = dataTransfer.files;
+            
+            updateUIAfterFileSelect(file);
+        });
     }
 }
 
