@@ -444,7 +444,10 @@ function initEditUploaders() {
 }
 
 function setupEditHandlers(exhibitId, exhibit, titleId, yearId, descId) {
-    document.getElementById('update-exhibit-btn').addEventListener('click', async () => {
+    const updateBtn = document.getElementById('update-exhibit-btn');
+    if (!updateBtn) return;
+    
+    updateBtn.addEventListener('click', async () => {
         const title = document.querySelector('.edit-title').value;
         const year = document.querySelector('.edit-year').value;
         const description = document.querySelector('.edit-description').value;
@@ -454,27 +457,26 @@ function setupEditHandlers(exhibitId, exhibit, titleId, yearId, descId) {
             return;
         }
         
+        // Показываем индикатор загрузки
+        updateBtn.textContent = '⏳ Сохранение...';
+        updateBtn.disabled = true;
+        
         const formData = new FormData();
         formData.append('title', title);
         formData.append('year', year);
         formData.append('description', description);
         
-        // Проверяем, есть ли новые файлы или флаги удаления
+        // Получаем файлы из загрузчиков
         const mediaInput = document.querySelector('input[name="media"]');
         const bgInput = document.querySelector('input[name="background"]');
-        const removeMediaFlag = document.querySelector('input[name="remove_media"]');
-        const removeBgFlag = document.querySelector('input[name="remove_background"]');
         
-        if (mediaInput?.files[0]) {
+        // Важно: если файл был выбран, добавляем его, даже если он не изменился
+        if (mediaInput && mediaInput.files && mediaInput.files[0]) {
             formData.append('media', mediaInput.files[0]);
-        } else if (removeMediaFlag && removeMediaFlag.value === 'true') {
-            formData.append('remove_media', 'true');
         }
         
-        if (bgInput?.files[0]) {
+        if (bgInput && bgInput.files && bgInput.files[0]) {
             formData.append('background', bgInput.files[0]);
-        } else if (removeBgFlag && removeBgFlag.value === 'true') {
-            formData.append('remove_background', 'true');
         }
         
         try {
@@ -487,20 +489,32 @@ function setupEditHandlers(exhibitId, exhibit, titleId, yearId, descId) {
             const data = await response.json();
             
             if (response.ok) {
-                NotificationManager.show(data.message, 'success');
+                NotificationManager.show(data.message || 'Экспонат обновлен!', 'success');
+                
+                // Очищаем кэш
                 clearCache('exhibits');
+                
+                // Принудительно перезагружаем список экспонатов
                 await loadExhibits(true);
-                // Закрываем модальное окно через событие
+                
+                // Закрываем модальное окно
                 const modal = document.querySelector('.modal-overlay');
-                if (modal) {
-                    const closeBtn = modal.querySelector('.modal-close');
-                    if (closeBtn) closeBtn.click();
-                }
+                if (modal) modal.remove();
+                
+                // Обновляем страницу, если нужно показать изменения
+                setTimeout(() => {
+                    location.reload();
+                }, 500);
             } else {
-                NotificationManager.show(data.error || 'Ошибка', 'error');
+                NotificationManager.show(data.error || 'Ошибка обновления', 'error');
+                updateBtn.textContent = '💾 Сохранить изменения';
+                updateBtn.disabled = false;
             }
         } catch (error) {
+            console.error('Ошибка:', error);
             NotificationManager.show('Ошибка соединения', 'error');
+            updateBtn.textContent = '💾 Сохранить изменения';
+            updateBtn.disabled = false;
         }
     });
     

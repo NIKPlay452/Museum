@@ -124,12 +124,109 @@ class FileUploader {
     }
     
     createUploadAreaFromContainer(container, inputName) {
-        if (!container) {
-            console.log('Контейнер не найден');
+    if (!container) {
+        console.log('Контейнер не найден');
+        return;
+    }
+    
+    container.innerHTML = '';
+    
+    const uniqueId = this.generateUniqueId();
+    const fileInputId = `file-${uniqueId}`;
+    const previewId = `preview-${uniqueId}`;
+    
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.name = inputName;
+    fileInput.id = fileInputId;
+    fileInput.accept = this.accept;
+    fileInput.style.display = 'none';
+    
+    const uploadArea = document.createElement('div');
+    uploadArea.className = 'file-upload-area';
+    
+    uploadArea.innerHTML = `
+        <label for="${fileInputId}" class="upload-label">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#c9a03d" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            <p>Нажмите для выбора файла</p>
+            <small>Макс. 10MB</small>
+        </label>
+        <div class="upload-preview" id="${previewId}" style="display: none;"></div>
+        <button class="clear-file-btn" style="display: none; margin-top: 10px; padding: 5px 10px; background: #e06c75; border: none; border-radius: 20px; color: white; cursor: pointer;">🗑️ Очистить</button>
+    `;
+    
+    uploadArea.appendChild(fileInput);
+    
+    let currentFile = null;
+    const preview = document.getElementById(previewId);
+    const label = uploadArea.querySelector('.upload-label');
+    const clearBtn = uploadArea.querySelector('.clear-file-btn');
+    
+    const updateUIAfterFileSelect = (file) => {
+        currentFile = file;
+        clearBtn.style.display = 'block';
+        
+        if (file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                preview.innerHTML = `
+                    <img src="${e.target.result}" alt="Preview">
+                    <p style="margin-top: 5px; font-size: 0.8rem; color: var(--primary);">${file.name}</p>
+                `;
+                preview.style.display = 'block';
+                label.style.display = 'none';
+            };
+            reader.readAsDataURL(file);
+        } else if (file.type.startsWith('video/')) {
+            const video = document.createElement('video');
+            video.src = URL.createObjectURL(file);
+            video.controls = true;
+            video.style.maxWidth = '100%';
+            video.style.maxHeight = '100px';
+            preview.innerHTML = '';
+            preview.appendChild(video);
+            const fileName = document.createElement('p');
+            fileName.textContent = file.name;
+            fileName.style.marginTop = '5px';
+            fileName.style.fontSize = '0.8rem';
+            fileName.style.color = 'var(--primary)';
+            preview.appendChild(fileName);
+            preview.style.display = 'block';
+            label.style.display = 'none';
+        }
+        
+        this.onUpload(file, inputName);
+    };
+    
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        if (file.size > this.maxSize) {
+            NotificationManager.show(`Файл слишком большой`, 'error');
+            fileInput.value = '';
             return;
         }
-        this._createUploadAreaElement(container, inputName);
-    }
+        
+        updateUIAfterFileSelect(file);
+    });
+    
+    clearBtn.addEventListener('click', () => {
+        currentFile = null;
+        fileInput.value = '';
+        preview.innerHTML = '';
+        preview.style.display = 'none';
+        label.style.display = 'flex';
+        clearBtn.style.display = 'none';
+        this.onUpload(null, inputName);
+    });
+    
+    container.appendChild(uploadArea);
+}
     
     _createUploadAreaElement(container, inputName) {
         container.innerHTML = '';
