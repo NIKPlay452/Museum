@@ -138,33 +138,7 @@ class StyleManager {
     }
     
     initStyleEditor() {
-        // Создаем кнопку-триггер для редактора стилей, если ее нет
-        if (!document.querySelector('.style-editor-trigger')) {
-            const trigger = document.createElement('button');
-            trigger.className = 'style-editor-trigger fab-button';
-            trigger.innerHTML = '🎨';
-            trigger.style.cssText = `
-                position: fixed;
-                bottom: 2rem;
-                right: 2rem;
-                width: 48px;
-                height: 48px;
-                border-radius: 50%;
-                background: var(--color-bg-card);
-                backdrop-filter: blur(8px);
-                border: var(--glass-border);
-                cursor: pointer;
-                z-index: 1000;
-                font-size: 1.5rem;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                transition: all var(--transition-speed);
-            `;
-            
-            trigger.onclick = () => this.openStyleEditor();
-            document.body.appendChild(trigger);
-        }
+        console.log('🎨 Редактор стилей доступен для администратора');
     }
     
     openStyleEditor() {

@@ -1,4 +1,3 @@
-/* ----- БАЗОВЫЕ СТИЛИ И ПЕРЕМЕННЫЕ ----- */
 :root {
     --color-primary: #c9a03d;
     --color-primary-light: #e0b354;
@@ -8,19 +7,21 @@
     --color-text-secondary: #a0aab8;
     --border-radius: 12px;
     --transition-speed: 0.25s;
+    --transition-fast: 0.15s ease;
     
     --color-bg-card: rgba(16, 20, 28, 0.85);
     --color-bg-elevated: rgba(24, 30, 40, 0.95);
+    --color-bg-overlay: rgba(0, 0, 0, 0.8);
     --color-text-muted: #6c7a8a;
     --color-border: rgba(201, 160, 61, 0.25);
+    --color-border-light: rgba(255, 255, 255, 0.08);
     --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
     --transition-base: var(--transition-speed) ease;
     --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.5);
     --glass-border: 1px solid var(--color-border);
-    --color-bg-overlay: rgba(0, 0, 0, 0.8);
-    --transition-fast: 0.15s ease;
-    --color-border-light: rgba(255, 255, 255, 0.08);
 }
 
 * {
@@ -43,7 +44,6 @@ body {
     overflow-x: hidden;
 }
 
-/* Фоновый элемент с эффектом */
 .background-overlay {
     position: fixed;
     top: 0;
@@ -55,7 +55,8 @@ body {
     z-index: -1;
 }
 
-/* ----- НАВИГАЦИЯ ----- */
+/* ===== НАВИГАЦИЯ ===== */
+
 .site-header {
     position: fixed;
     top: 0;
@@ -131,7 +132,6 @@ body {
     gap: 1rem;
 }
 
-/* Кнопки входа/профиля */
 .btn-outline {
     padding: 0.5rem 1.25rem;
     border-radius: 40px;
@@ -163,14 +163,40 @@ body {
     color: var(--color-primary-light);
 }
 
-/* ----- ОСНОВНОЙ КОНТЕЙНЕР ----- */
+/* ===== ОСНОВНЫЕ КОНТЕЙНЕРЫ ===== */
+
 .container {
     max-width: 1400px;
     margin: 0 auto;
-    padding: 6rem 2rem 3rem;
+    padding: 6rem 150px 3rem;
 }
 
-/* ----- ХРОНОЛОГИЯ (ГЛАВНАЯ) ----- */
+.admin-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 6rem 150px 3rem;
+}
+
+@media (max-width: 1024px) {
+    .container, .admin-container {
+        padding: 6rem 50px 3rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .container, .admin-container {
+        padding: 5rem 50px 2rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .container, .admin-container {
+        padding: 5rem 20px 2rem;
+    }
+}
+
+/* ===== ХРОНОЛОГИЯ ===== */
+
 .timeline-header {
     text-align: center;
     margin-bottom: 4rem;
@@ -197,7 +223,8 @@ body {
     position: relative;
     margin: 3rem 0;
     overflow-x: auto;
-    padding-bottom: 1rem;
+    overflow-y: visible;
+    padding: 1rem 0 2rem;
 }
 
 .timeline-line {
@@ -230,11 +257,14 @@ body {
     background: rgba(16, 20, 28, 0.5);
     backdrop-filter: blur(4px);
     min-width: 70px;
+    overflow: visible;
+    z-index: 1;
 }
 
 .timeline-point:hover {
     transform: translateY(-4px);
     background: rgba(201, 160, 61, 0.15);
+    z-index: 2;
 }
 
 .timeline-point .year {
@@ -259,7 +289,8 @@ body {
     box-shadow: 0 0 12px var(--color-primary-light);
 }
 
-/* Карточка экспоната */
+/* ===== КАРТОЧКА ЭКСПОНАТА ===== */
+
 .exhibit-details {
     background: var(--color-bg-card);
     backdrop-filter: blur(16px);
@@ -268,7 +299,12 @@ body {
     border-radius: 24px;
     padding: 2rem;
     margin-top: 2rem;
+    position: relative;
     animation: fadeInUp 0.4s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+}
+
+.exhibit-details.fade-out {
+    animation: fadeOutDown 0.2s ease forwards;
 }
 
 @keyframes fadeInUp {
@@ -280,6 +316,42 @@ body {
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+@keyframes fadeOutDown {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+}
+
+.close-details {
+    position: absolute;
+    top: 1rem;
+    right: 1.5rem;
+    background: rgba(16, 20, 28, 0.8);
+    border: 1px solid var(--color-border);
+    border-radius: 30px;
+    width: 32px;
+    height: 32px;
+    font-size: 1.2rem;
+    cursor: pointer;
+    color: var(--color-text-secondary);
+    transition: var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.close-details:hover {
+    background: var(--color-primary);
+    color: var(--color-bg-dark);
+    transform: rotate(90deg);
+    border-color: var(--color-primary);
 }
 
 .exhibit-content {
@@ -329,7 +401,8 @@ body {
     line-height: 1.7;
 }
 
-/* ----- СТРАНИЦА "О НАС" ----- */
+/* ===== СТРАНИЦА "О НАС" ===== */
+
 .about-section {
     max-width: 800px;
     margin: 0 auto;
@@ -362,12 +435,7 @@ body {
     margin-bottom: 1rem;
 }
 
-/* ----- АДМИН-ПАНЕЛЬ ----- */
-.admin-container {
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 6rem 2rem 3rem;
-}
+/* ===== АДМИН-ПАНЕЛЬ ===== */
 
 .admin-title {
     font-size: 2rem;
@@ -405,7 +473,8 @@ body {
     background: rgba(201, 160, 61, 0.1);
 }
 
-/* ----- ФОРМЫ И МОДАЛЬНЫЕ ОКНА ----- */
+/* ===== ФОРМЫ И МОДАЛЬНЫЕ ОКНА ===== */
+
 .modal-overlay {
     position: fixed;
     top: 0;
@@ -493,6 +562,42 @@ body {
     box-shadow: 0 0 0 3px rgba(201, 160, 61, 0.2);
 }
 
+select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23c9a03d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    background-size: 16px;
+    cursor: pointer;
+}
+
+select option {
+    background: var(--color-bg-dark);
+    color: var(--color-text-primary);
+    padding: 0.5rem;
+}
+
+.admin-select {
+    width: 100%;
+    padding: 0.75rem 2rem 0.75rem 1rem;
+    background: var(--color-bg-dark);
+    border: 1px solid var(--color-border-light);
+    border-radius: 12px;
+    color: var(--color-text-primary);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.admin-select:hover,
+.admin-select:focus {
+    border-color: var(--color-primary);
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(201, 160, 61, 0.1);
+}
+
 .submit-btn {
     width: 100%;
     padding: 0.85rem;
@@ -511,7 +616,124 @@ body {
     transform: translateY(-2px);
 }
 
-/* ----- УВЕДОМЛЕНИЯ ----- */
+/* ===== СТРАНИЦА ВХОДА ===== */
+
+.login-page {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background: var(--color-bg-dark);
+}
+
+.login-container {
+    background: var(--color-bg-elevated);
+    backdrop-filter: blur(16px);
+    padding: 2.5rem;
+    border-radius: 24px;
+    border: var(--glass-border);
+    width: 100%;
+    max-width: 420px;
+    margin: 0 20px;
+}
+
+.login-form h2 {
+    text-align: center;
+    margin-bottom: 2rem;
+    color: var(--color-primary);
+    font-size: 1.5rem;
+}
+
+.error-message {
+    color: #e06c75;
+    text-align: center;
+    margin-top: 1rem;
+    font-size: 0.85rem;
+}
+
+/* ===== ПРИВЕТСТВЕННЫЙ ЭКРАН ===== */
+
+.welcome-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--color-bg-dark);
+    backdrop-filter: blur(20px);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+}
+
+.welcome-content {
+    text-align: center;
+    padding: 2rem;
+    animation: welcomeSlideUp 0.6s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+}
+
+@keyframes welcomeSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.welcome-icon {
+    font-size: 4rem;
+    margin-bottom: 1.5rem;
+    animation: iconPulse 2s ease infinite;
+}
+
+@keyframes iconPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+.welcome-title {
+    font-size: clamp(1.5rem, 5vw, 2.5rem);
+    font-weight: 700;
+    background: linear-gradient(135deg, #fff, var(--color-primary-light));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    margin-bottom: 1rem;
+}
+
+.welcome-text {
+    color: var(--color-text-secondary);
+    max-width: 500px;
+    margin: 0 auto 2rem;
+    font-size: 1rem;
+}
+
+.welcome-btn {
+    padding: 0.75rem 2rem;
+    background: transparent;
+    border: 1px solid var(--color-primary);
+    border-radius: 40px;
+    color: var(--color-primary);
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.welcome-btn:hover {
+    background: var(--color-primary);
+    color: var(--color-bg-dark);
+    transform: translateY(-2px);
+}
+
+/* ===== УВЕДОМЛЕНИЯ ===== */
+
 #notification-container {
     position: fixed;
     bottom: 2rem;
@@ -544,35 +766,13 @@ body {
     }
 }
 
-/* ----- АДАПТИВНОСТЬ ----- */
-@media (max-width: 768px) {
-    .site-header {
-        padding: 0.5rem 1rem;
-    }
-    
-    .nav-container {
-        flex-wrap: wrap;
-        gap: 0.75rem;
-    }
-    
-    .nav-links {
-        order: 3;
-        width: 100%;
-        justify-content: center;
-        gap: 1rem;
-    }
-    
-    .container,
-    .admin-container {
-        padding: 5rem 1rem 2rem;
-    }
-    
-    .timeline-points {
-        min-width: 500px;
-    }
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
 
-/* ----- КНОПКИ FAB ----- */
+/* ===== FAB КНОПКИ ===== */
+
 .fab-button {
     position: fixed;
     bottom: 2rem;
@@ -588,6 +788,7 @@ body {
     transition: var(--transition-base);
     cursor: pointer;
     z-index: 100;
+    text-decoration: none;
 }
 
 .fab-button:hover {
@@ -603,6 +804,19 @@ body {
     left: calc(2rem + 64px);
 }
 
+.fab-telegram svg,
+.fab-yandex svg {
+    width: 24px;
+    height: 24px;
+    fill: var(--color-primary);
+    transition: var(--transition-base);
+}
+
+.fab-telegram:hover svg,
+.fab-yandex:hover svg {
+    fill: var(--color-bg-dark);
+}
+
 @media (max-width: 768px) {
     .fab-telegram {
         left: 1rem;
@@ -612,7 +826,8 @@ body {
     }
 }
 
-/* Режим редактирования стилей (админка) */
+/* ===== РЕДАКТОР СТИЛЕЙ ===== */
+
 .style-editor-panel {
     position: fixed;
     bottom: 2rem;
@@ -650,4 +865,28 @@ body {
     border: 1px solid var(--color-border-light);
     border-radius: 8px;
     color: white;
+}
+
+/* ===== АДАПТИВНОСТЬ ===== */
+
+@media (max-width: 768px) {
+    .site-header {
+        padding: 0.5rem 1rem;
+    }
+    
+    .nav-container {
+        flex-wrap: wrap;
+        gap: 0.75rem;
+    }
+    
+    .nav-links {
+        order: 3;
+        width: 100%;
+        justify-content: center;
+        gap: 1rem;
+    }
+    
+    .timeline-points {
+        min-width: 500px;
+    }
 }

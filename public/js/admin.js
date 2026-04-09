@@ -63,6 +63,17 @@ function setupAdminButtons() {
     document.querySelector('[data-action="edit"]').addEventListener('click', openEditModal);
     document.querySelector('[data-action="status"]').addEventListener('click', openStatusModal);
     
+    const styleEditorBtn = document.querySelector('[data-action="style-editor"]');
+    if (styleEditorBtn) {
+        styleEditorBtn.addEventListener('click', () => {
+            if (window.styleManager && typeof window.styleManager.openStyleEditor === 'function') {
+                window.styleManager.openStyleEditor();
+            } else {
+                NotificationManager.show('Редактор стилей временно недоступен', 'error');
+            }
+        });
+    }
+    
     if (currentUser?.role === 'admin') {
         document.querySelector('[data-action="editors"]').addEventListener('click', openEditorsModal);
         document.querySelector('[data-action="applications"]').addEventListener('click', openApplicationsModal);

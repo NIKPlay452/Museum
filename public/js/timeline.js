@@ -1,7 +1,3 @@
-// ============================================================================
-// ВРЕМЕННАЯ ШКАЛА
-// ============================================================================
-
 document.addEventListener('DOMContentLoaded', async () => {
     const timelinePoints = document.getElementById('timeline-points');
     const exhibitDetails = document.getElementById('exhibit-details');
@@ -9,39 +5,63 @@ document.addEventListener('DOMContentLoaded', async () => {
     const overlay = document.querySelector('.background-overlay');
     
     let exhibits = [];
+    let currentExhibit = null;
     
-    // Загрузка экспонатов с кэшированием
     try {
         exhibits = await fetchWithCache('/api/exhibits', 'exhibits');
         renderTimeline(exhibits);
+        if (exhibits.length > 0) {
+            await showExhibitDetails(exhibits[0]);
+        }
     } catch (error) {
         console.error('Ошибка загрузки:', error);
     }
     
-    // Рендер точек на шкале
     function renderTimeline(exhibits) {
         if (!timelinePoints) return;
         
         timelinePoints.innerHTML = '';
         
-        exhibits.forEach(exhibit => {
+        exhibits.forEach((exhibit, index) => {
             const point = document.createElement('div');
             point.className = 'timeline-point';
             point.dataset.id = exhibit.id;
+            point.dataset.index = index;
             point.innerHTML = `
                 <span class="year">${exhibit.year}</span>
                 <div class="dot"></div>
             `;
-            point.addEventListener('click', () => showExhibitDetails(exhibit));
+            point.addEventListener('click', () => showExhibitDetails(exhibit, point));
             timelinePoints.appendChild(point);
         });
+        
+        if (timelinePoints.firstChild) {
+            timelinePoints.firstChild.classList.add('active');
+        }
     }
     
-    // Показать детали экспоната
-    function showExhibitDetails(exhibit) {
+    async function showExhibitDetails(exhibit, activePoint = null) {
         if (!exhibitDetails || !overlay) return;
         
-        // Меняем фон
+        if (currentExhibit && currentExhibit.id === exhibit.id) return;
+        
+        if (exhibitDetails.style.display === 'block' && currentExhibit) {
+            exhibitDetails.classList.add('fade-out');
+            await new Promise(resolve => setTimeout(resolve, 200));
+            exhibitDetails.classList.remove('fade-out');
+        }
+        
+        document.querySelectorAll('.timeline-point').forEach(point => {
+            point.classList.remove('active');
+        });
+        
+        if (activePoint) {
+            activePoint.classList.add('active');
+        } else {
+            const point = document.querySelector(`.timeline-point[data-id="${exhibit.id}"]`);
+            if (point) point.classList.add('active');
+        }
+        
         if (exhibit.background_path) {
             overlay.style.backgroundImage = `url(${exhibit.background_path})`;
             overlay.style.opacity = '0.3';
@@ -50,7 +70,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             overlay.style.opacity = '0.15';
         }
         
-        // Заполняем данными
         document.getElementById('exhibit-title').textContent = exhibit.title;
         document.getElementById('exhibit-year').textContent = exhibit.year;
         document.getElementById('exhibit-description').textContent = exhibit.description;
@@ -79,16 +98,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         
         exhibitDetails.style.display = 'block';
+        currentExhibit = exhibit;
     }
     
-    // Закрыть детали
-if (closeBtn) {
-    closeBtn.addEventListener('click', () => {
-        exhibitDetails.style.display = 'none';
-        if (overlay) {
-            overlay.style.backgroundImage = '';
-            overlay.style.opacity = '0.15';
-        }
-    });
-}
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+            exhibitDetails.classList.add('fade-out');
+            setTimeout(() => {
+                exhibitDetails.style.display = 'none';
+                exhibitDetails.classList.remove('fade-out');
+                overlay.style.backgroundImage = '';
+                overlay.style.opacity = '0.15';
+                currentExhibit = null;
+            }, 200);
+        });
+    }
 });
