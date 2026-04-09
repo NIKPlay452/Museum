@@ -1405,3 +1405,546 @@ async function logout() {
         }
     });
 }
+
+// ============================================================================
+// ТЕСТЫ
+// ============================================================================
+function setupAdminButtons() {
+    document.querySelector('[data-action="create"]').addEventListener('click', openCreateModal);
+    document.querySelector('[data-action="edit"]').addEventListener('click', openEditModal);
+    document.querySelector('[data-action="status"]').addEventListener('click', openStatusModal);
+    
+    // Добавляем обработчик для кнопки тестирования
+    const testsBtn = document.querySelector('[data-action="tests"]');
+    if (testsBtn) {
+        testsBtn.addEventListener('click', openTestsModal);
+    }
+    
+    // Обработчик для редактора стилей
+    const styleEditorBtn = document.querySelector('[data-action="style-editor"]');
+    if (styleEditorBtn) {
+        styleEditorBtn.addEventListener('click', () => {
+            if (window.styleManager && typeof window.styleManager.openStyleEditor === 'function') {
+                window.styleManager.openStyleEditor();
+            } else {
+                NotificationManager.show('Редактор стилей временно недоступен', 'error');
+            }
+        });
+    }
+    
+    if (currentUser?.role === 'admin') {
+        document.querySelector('[data-action="editors"]').addEventListener('click', openEditorsModal);
+        document.querySelector('[data-action="applications"]').addEventListener('click', openApplicationsModal);
+        
+        setInterval(async () => {
+            await loadExhibits(true);
+        }, 30000);
+    }
+}
+
+// ============================================================================
+// ПАНЕЛЬ ТЕСТИРОВАНИЯ
+// ============================================================================
+
+async function openTestsModal() {
+    const modalContent = `
+        <div class="tests-panel">
+            <style>
+                .tests-panel {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 1.5rem;
+                }
+                .test-section {
+                    background: var(--color-bg-dark);
+                    border: 1px solid var(--color-border);
+                    border-radius: 16px;
+                    padding: 1.25rem;
+                }
+                .test-section h3 {
+                    color: var(--color-primary);
+                    margin-bottom: 1rem;
+                    font-size: 1.1rem;
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                }
+                .test-buttons {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 0.75rem;
+                }
+                .test-btn {
+                    padding: 0.5rem 1rem;
+                    background: transparent;
+                    border: 1px solid var(--color-border);
+                    border-radius: 8px;
+                    color: var(--color-text-primary);
+                    cursor: pointer;
+                    transition: var(--transition-base);
+                    font-size: 0.85rem;
+                }
+                .test-btn:hover {
+                    border-color: var(--color-primary);
+                    transform: translateY(-1px);
+                }
+                .test-btn.danger {
+                    border-color: #e06c75;
+                    color: #e06c75;
+                }
+                .test-btn.danger:hover {
+                    background: #e06c75;
+                    color: var(--color-bg-dark);
+                }
+                .test-btn.success {
+                    border-color: var(--color-primary);
+                    color: var(--color-primary);
+                }
+                .test-btn.success:hover {
+                    background: var(--color-primary);
+                    color: var(--color-bg-dark);
+                }
+                .test-result {
+                    margin-top: 1rem;
+                    padding: 0.75rem;
+                    background: rgba(201, 160, 61, 0.1);
+                    border-radius: 8px;
+                    font-family: monospace;
+                    font-size: 0.8rem;
+                    color: var(--color-text-secondary);
+                    max-height: 200px;
+                    overflow-y: auto;
+                    display: none;
+                }
+                .test-result.show {
+                    display: block;
+                }
+                .test-result pre {
+                    margin: 0;
+                    white-space: pre-wrap;
+                    word-break: break-all;
+                }
+                .status-badge {
+                    display: inline-block;
+                    padding: 0.2rem 0.5rem;
+                    border-radius: 20px;
+                    font-size: 0.7rem;
+                    margin-left: 0.5rem;
+                }
+                .status-badge.pass {
+                    background: rgba(76, 175, 80, 0.2);
+                    color: #4caf50;
+                }
+                .status-badge.fail {
+                    background: rgba(224, 108, 117, 0.2);
+                    color: #e06c75;
+                }
+                .status-badge.pending {
+                    background: rgba(201, 160, 61, 0.2);
+                    color: var(--color-primary-light);
+                }
+            </style>
+            
+            <div class="test-section">
+                <h3>🔌 API Endpoints</h3>
+                <div class="test-buttons">
+                    <button class="test-btn success" data-test="api-health">🏥 Health Check</button>
+                    <button class="test-btn success" data-test="api-exhibits">📦 Получить экспонаты</button>
+                    <button class="test-btn success" data-test="api-styles">🎨 Получить стили</button>
+                    <button class="test-btn success" data-test="api-me">👤 Проверить авторизацию</button>
+                </div>
+                <div id="test-api-result" class="test-result"></div>
+            </div>
+            
+            <div class="test-section">
+                <h3>📂 База данных</h3>
+                <div class="test-buttons">
+                    <button class="test-btn" data-test="db-users">👥 Пользователи</button>
+                    <button class="test-btn" data-test="db-exhibits">🖼️ Экспонаты</button>
+                    <button class="test-btn" data-test="db-applications">📨 Заявки</button>
+                    <button class="test-btn" data-test="db-settings">⚙️ Настройки</button>
+                    <button class="test-btn" data-test="db-stats">📊 Статистика</button>
+                </div>
+                <div id="test-db-result" class="test-result"></div>
+            </div>
+            
+            <div class="test-section">
+                <h3>🖼️ Изображения</h3>
+                <div class="test-buttons">
+                    <button class="test-btn" data-test="image-check">🔍 Проверить все изображения</button>
+                    <button class="test-btn" data-test="image-speed">⚡ Скорость загрузки</button>
+                </div>
+                <div id="test-image-result" class="test-result"></div>
+            </div>
+            
+            <div class="test-section">
+                <h3>🚀 Производительность</h3>
+                <div class="test-buttons">
+                    <button class="test-btn" data-test="perf-api">⏱️ Время ответа API</button>
+                    <button class="test-btn" data-test="perf-db">⏱️ Время запросов БД</button>
+                </div>
+                <div id="test-perf-result" class="test-result"></div>
+            </div>
+            
+            <div class="test-section">
+                <h3>⚠️ Опасные операции</h3>
+                <div class="test-buttons">
+                    <button class="test-btn danger" data-test="create-test-exhibit">➕ Создать тестовый экспонат</button>
+                    <button class="test-btn danger" data-test="create-test-editor">👤 Создать тестового редактора</button>
+                    <button class="test-btn danger" data-test="cleanup-tests">🗑️ Очистить тестовые данные</button>
+                </div>
+                <div id="test-danger-result" class="test-result"></div>
+            </div>
+        </div>
+    `;
+    
+    const modal = createModal({
+        title: '🧪 Панель тестирования',
+        content: modalContent,
+        width: '700px'
+    });
+    
+    attachTestHandlers(modal);
+}
+
+// Привязка обработчиков к кнопкам
+function attachTestHandlers(modal) {
+    // API тесты
+    document.querySelector('[data-test="api-health"]').addEventListener('click', () => testApiHealth());
+    document.querySelector('[data-test="api-exhibits"]').addEventListener('click', () => testApiExhibits());
+    document.querySelector('[data-test="api-styles"]').addEventListener('click', () => testApiStyles());
+    document.querySelector('[data-test="api-me"]').addEventListener('click', () => testApiMe());
+    
+    // БД тесты
+    document.querySelector('[data-test="db-users"]').addEventListener('click', () => testDbUsers());
+    document.querySelector('[data-test="db-exhibits"]').addEventListener('click', () => testDbExhibits());
+    document.querySelector('[data-test="db-applications"]').addEventListener('click', () => testDbApplications());
+    document.querySelector('[data-test="db-settings"]').addEventListener('click', () => testDbSettings());
+    document.querySelector('[data-test="db-stats"]').addEventListener('click', () => testDbStats());
+    
+    // Изображения
+    document.querySelector('[data-test="image-check"]').addEventListener('click', () => testImageCheck());
+    document.querySelector('[data-test="image-speed"]').addEventListener('click', () => testImageSpeed());
+    
+    // Производительность
+    document.querySelector('[data-test="perf-api"]').addEventListener('click', () => testPerfApi());
+    document.querySelector('[data-test="perf-db"]').addEventListener('click', () => testPerfDb());
+    
+    // Опасные операции
+    document.querySelector('[data-test="create-test-exhibit"]').addEventListener('click', () => testCreateExhibit());
+    document.querySelector('[data-test="create-test-editor"]').addEventListener('click', () => testCreateEditor());
+    document.querySelector('[data-test="cleanup-tests"]').addEventListener('click', () => testCleanup());
+}
+
+// ============================================================================
+// РЕАЛИЗАЦИЯ ТЕСТОВ
+// ============================================================================
+
+async function showResult(containerId, title, data, isError = false) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    
+    container.classList.add('show');
+    const color = isError ? '#e06c75' : '#4caf50';
+    container.innerHTML = `
+        <div style="color: ${color}; margin-bottom: 0.5rem;">📌 ${title}</div>
+        <pre>${typeof data === 'object' ? JSON.stringify(data, null, 2) : data}</pre>
+    `;
+    
+    setTimeout(() => {
+        container.classList.remove('show');
+    }, 5000);
+}
+
+// API тесты
+async function testApiHealth() {
+    try {
+        const start = Date.now();
+        const response = await fetch('/api/test', { credentials: 'include' });
+        const duration = Date.now() - start;
+        const data = await response.json();
+        showResult('test-api-result', `✅ API работает (${duration}ms)`, data);
+    } catch (error) {
+        showResult('test-api-result', '❌ Ошибка API', error.message, true);
+    }
+}
+
+async function testApiExhibits() {
+    try {
+        const response = await fetch('/api/exhibits', { credentials: 'include' });
+        const data = await response.json();
+        showResult('test-api-result', `✅ Экспонатов: ${data.length}`, data.slice(0, 5));
+    } catch (error) {
+        showResult('test-api-result', '❌ Ошибка загрузки', error.message, true);
+    }
+}
+
+async function testApiStyles() {
+    try {
+        const response = await fetch('/api/site-styles', { credentials: 'include' });
+        const data = await response.json();
+        showResult('test-api-result', '✅ Стили загружены', data);
+    } catch (error) {
+        showResult('test-api-result', '❌ Ошибка стилей', error.message, true);
+    }
+}
+
+async function testApiMe() {
+    try {
+        const response = await fetch('/api/me', { credentials: 'include' });
+        const data = await response.json();
+        showResult('test-api-result', '✅ Авторизация', data);
+    } catch (error) {
+        showResult('test-api-result', '❌ Не авторизован', error.message, true);
+    }
+}
+
+// БД тесты
+async function testDbUsers() {
+    try {
+        const response = await fetch('/api/admin/editors', { credentials: 'include' });
+        const data = await response.json();
+        showResult('test-db-result', `👥 Пользователей: ${data.length}`, data);
+    } catch (error) {
+        showResult('test-db-result', '❌ Ошибка', error.message, true);
+    }
+}
+
+async function testDbExhibits() {
+    try {
+        const response = await fetch('/api/exhibits/all', { credentials: 'include' });
+        const data = await response.json();
+        showResult('test-db-result', `🖼️ Экспонатов: ${data.length}`, data.map(e => ({ id: e.id, title: e.title, status: e.status })));
+    } catch (error) {
+        showResult('test-db-result', '❌ Ошибка', error.message, true);
+    }
+}
+
+async function testDbApplications() {
+    try {
+        const response = await fetch('/api/admin/applications', { credentials: 'include' });
+        const data = await response.json();
+        showResult('test-db-result', `📨 Заявок: ${data.length}`, data);
+    } catch (error) {
+        showResult('test-db-result', '❌ Ошибка', error.message, true);
+    }
+}
+
+async function testDbSettings() {
+    try {
+        const response = await fetch('/api/site-styles', { credentials: 'include' });
+        const data = await response.json();
+        showResult('test-db-result', `⚙️ Настроек: ${Object.keys(data).length}`, data);
+    } catch (error) {
+        showResult('test-db-result', '❌ Ошибка', error.message, true);
+    }
+}
+
+async function testDbStats() {
+    try {
+        const users = await fetch('/api/admin/editors', { credentials: 'include' });
+        const exhibits = await fetch('/api/exhibits/all', { credentials: 'include' });
+        const apps = await fetch('/api/admin/applications', { credentials: 'include' });
+        
+        const stats = {
+            users: (await users.json()).length,
+            exhibits: (await exhibits.json()).length,
+            applications: (await apps.json()).length
+        };
+        showResult('test-db-result', '📊 Статистика БД', stats);
+    } catch (error) {
+        showResult('test-db-result', '❌ Ошибка', error.message, true);
+    }
+}
+
+// Тесты изображений
+async function testImageCheck() {
+    const container = document.getElementById('test-image-result');
+    container.classList.add('show');
+    container.innerHTML = '<div>🔍 Проверка изображений экспонатов...</div>';
+    
+    try {
+        const exhibitsRes = await fetch('/api/exhibits', { credentials: 'include' });
+        const exhibits = await exhibitsRes.json();
+        
+        const results = [];
+        for (const exhibit of exhibits.slice(0, 10)) {
+            if (exhibit.media_path) {
+                try {
+                    const imgCheck = await fetch(exhibit.media_path, { method: 'HEAD' });
+                    results.push({
+                        title: exhibit.title,
+                        url: exhibit.media_path.substring(0, 50) + '...',
+                        status: imgCheck.ok ? '✅' : '❌',
+                        size: imgCheck.headers.get('content-length') ? Math.round(imgCheck.headers.get('content-length') / 1024) + 'KB' : '?'
+                    });
+                } catch {
+                    results.push({ title: exhibit.title, status: '❌', error: 'Не загружается' });
+                }
+            }
+        }
+        
+        showResult('test-image-result', `📸 Проверено ${results.length} изображений`, results);
+    } catch (error) {
+        showResult('test-image-result', '❌ Ошибка', error.message, true);
+    }
+}
+
+async function testImageSpeed() {
+    const container = document.getElementById('test-image-result');
+    container.classList.add('show');
+    container.innerHTML = '<div>⚡ Измерение скорости загрузки...</div>';
+    
+    try {
+        const exhibitsRes = await fetch('/api/exhibits', { credentials: 'include' });
+        const exhibits = await exhibitsRes.json();
+        
+        const speeds = [];
+        for (const exhibit of exhibits.slice(0, 5)) {
+            if (exhibit.media_path) {
+                const start = Date.now();
+                try {
+                    await fetch(exhibit.media_path, { method: 'HEAD' });
+                    const duration = Date.now() - start;
+                    speeds.push({ title: exhibit.title, time: duration + 'ms', speed: duration < 100 ? '🚀' : duration < 500 ? '✅' : '⚠️' });
+                } catch {
+                    speeds.push({ title: exhibit.title, time: 'Ошибка', speed: '❌' });
+                }
+            }
+        }
+        
+        showResult('test-image-result', '⚡ Скорость загрузки изображений', speeds);
+    } catch (error) {
+        showResult('test-image-result', '❌ Ошибка', error.message, true);
+    }
+}
+
+// Тесты производительности
+async function testPerfApi() {
+    const container = document.getElementById('test-perf-result');
+    container.classList.add('show');
+    container.innerHTML = '<div>⏱️ Измерение времени API...</div>';
+    
+    const endpoints = ['/api/exhibits', '/api/site-styles', '/api/test'];
+    const results = [];
+    
+    for (const endpoint of endpoints) {
+        const start = Date.now();
+        await fetch(endpoint, { credentials: 'include' });
+        const duration = Date.now() - start;
+        results.push({ endpoint, time: duration + 'ms', grade: duration < 50 ? '🚀' : duration < 200 ? '✅' : '⚠️' });
+    }
+    
+    showResult('test-perf-result', '⏱️ Время ответа API', results);
+}
+
+async function testPerfDb() {
+    const container = document.getElementById('test-perf-result');
+    container.classList.add('show');
+    container.innerHTML = '<div>⏱️ Измерение времени БД...</div>';
+    
+    const queries = ['/api/exhibits', '/api/site-styles', '/api/admin/editors'];
+    const results = [];
+    
+    for (const query of queries) {
+        const start = Date.now();
+        await fetch(query, { credentials: 'include' });
+        const duration = Date.now() - start;
+        results.push({ query, time: duration + 'ms', grade: duration < 100 ? '🚀' : duration < 300 ? '✅' : '⚠️' });
+    }
+    
+    showResult('test-perf-result', '⏱️ Время запросов к БД', results);
+}
+
+// Опасные операции
+async function testCreateExhibit() {
+    if (!confirm('Создать тестовый экспонат? (Можно будет удалить позже)')) return;
+    
+    const container = document.getElementById('test-danger-result');
+    container.classList.add('show');
+    container.innerHTML = '<div>➕ Создание тестового экспоната...</div>';
+    
+    try {
+        const formData = new FormData();
+        formData.append('title', '[TEST] Тестовый экспонат');
+        formData.append('year', '2024');
+        formData.append('description', 'Это тестовый экспонат, созданный через панель тестирования. Может быть удалён.');
+        
+        const response = await fetch('/api/exhibits', {
+            method: 'POST',
+            body: formData,
+            credentials: 'include'
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showResult('test-danger-result', '✅ Тестовый экспонат создан', data);
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            showResult('test-danger-result', '❌ Ошибка', data, true);
+        }
+    } catch (error) {
+        showResult('test-danger-result', '❌ Ошибка', error.message, true);
+    }
+}
+
+async function testCreateEditor() {
+    if (!confirm('Создать тестового редактора? (Логин: test_editor, Пароль: test123)')) return;
+    
+    const container = document.getElementById('test-danger-result');
+    container.classList.add('show');
+    container.innerHTML = '<div>👤 Создание тестового редактора...</div>';
+    
+    try {
+        const response = await fetch('/api/admin/editors', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                username: 'test_editor_' + Date.now(),
+                password: 'test123',
+                email: 'test@example.com'
+            }),
+            credentials: 'include'
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showResult('test-danger-result', '✅ Тестовый редактор создан', data);
+        } else {
+            showResult('test-danger-result', '❌ Ошибка', data, true);
+        }
+    } catch (error) {
+        showResult('test-danger-result', '❌ Ошибка', error.message, true);
+    }
+}
+
+async function testCleanup() {
+    if (!confirm('Удалить все тестовые данные? (Экспонаты с [TEST] в названии)')) return;
+    
+    const container = document.getElementById('test-danger-result');
+    container.classList.add('show');
+    container.innerHTML = '<div>🗑️ Очистка тестовых данных...</div>';
+    
+    try {
+        const exhibitsRes = await fetch('/api/exhibits/all', { credentials: 'include' });
+        const exhibits = await exhibitsRes.json();
+        
+        const testExhibits = exhibits.filter(e => e.title && e.title.includes('[TEST]'));
+        let deleted = 0;
+        
+        for (const exhibit of testExhibits) {
+            const response = await fetch(`/api/admin/exhibits/${exhibit.id}`, {
+                method: 'DELETE',
+                credentials: 'include'
+            });
+            if (response.ok) deleted++;
+        }
+        
+        showResult('test-danger-result', `✅ Удалено тестовых экспонатов: ${deleted}`, { deleted });
+        
+    } catch (error) {
+        showResult('test-danger-result', '❌ Ошибка', error.message, true);
+    }
+}
