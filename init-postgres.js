@@ -43,6 +43,34 @@ async function initDatabase() {
     `);
     console.log('   ✅ Таблица users');
     
+    async function addTestApplication() {
+    console.log('📝 Добавление тестовой заявки...');
+    
+    try {
+        // Проверяем, есть ли уже заявка
+        const existing = await query(`SELECT * FROM applications WHERE username = 'Nick'`);
+        
+        if (existing.rows.length === 0) {
+            await query(`
+                INSERT INTO applications (full_name, username, email, reason, telegram_chat_id, status) 
+                VALUES ($1, $2, $3, $4, $5, 'pending')
+            `, [
+                'Nick Test',
+                'Nick',
+                'Nick@yandex.ru',
+                'Хочу стать редактором музея компьютерных технологий, чтобы помогать наполнять сайт информацией о советской и российской компьютерной технике.',
+                '999999999999'
+            ]);
+            console.log('✅ Тестовая заявка добавлена');
+        } else {
+            console.log('ℹ️ Заявка уже существует');
+        }
+    } catch (error) {
+        console.error('❌ Ошибка:', error);
+    }
+}
+addTestApplication();
+    
     await query(`
         CREATE TABLE IF NOT EXISTS exhibits (
             id SERIAL PRIMARY KEY,

@@ -640,7 +640,7 @@ async function loadPendingCreations(container) {
                     <div class="description">${escapeHtml(exhibit.description)}</div>
                     ${exhibit.media_path ? `
                         <div class="media-preview-small">
-                            <img src="${exhibit.media_path}" alt="Превью" loading="lazy" onerror="this.style.display='none'">
+                            <img src="${exhibit.media_path}" alt="Превью" style="max-width: 150px; max-height: 100px; object-fit: contain;" loading="lazy" onerror="this.style.display='none'">
                         </div>
                     ` : ''}
                     <div class="card-actions">
@@ -698,13 +698,13 @@ async function loadPendingEdits(container) {
                         ${original.media_path ? `
                             <div class="media-preview">
                                 <label>Изображение:</label>
-                                <img src="${original.media_path}" alt="Оригинал" loading="lazy" onerror="this.style.display='none'">
+                                <img src="${original.media_path}" alt="Оригинал" style="max-width: 150px; max-height: 100px; object-fit: contain;" loading="lazy" onerror="this.style.display='none'">
                             </div>
                         ` : '<p class="no-media">Нет изображения</p>'}
                         ${original.background_path ? `
                             <div class="media-preview">
                                 <label>Фон:</label>
-                                <img src="${original.background_path}" alt="Фон оригинала" loading="lazy" onerror="this.style.display='none'">
+                                <img src="${original.background_path}" alt="Фон оригинала" style="max-width: 150px; max-height: 100px; object-fit: contain;" loading="lazy" onerror="this.style.display='none'">
                             </div>
                         ` : ''}
                     </div>
@@ -716,7 +716,7 @@ async function loadPendingEdits(container) {
                         ${edit.media_path && edit.media_path !== original.media_path ? `
                             <div class="media-preview changed">
                                 <label>🔄 Новое изображение:</label>
-                                <img src="${edit.media_path}" alt="Новое изображение" loading="lazy" onerror="this.style.display='none'">
+                                <img src="${edit.media_path}" alt="Новое изображение" style="max-width: 150px; max-height: 100px; object-fit: contain;" loading="lazy" onerror="this.style.display='none'">
                             </div>
                         ` : edit.media_path ? `
                             <div class="media-preview unchanged">
@@ -726,7 +726,7 @@ async function loadPendingEdits(container) {
                         ${edit.background_path && edit.background_path !== original.background_path ? `
                             <div class="media-preview changed">
                                 <label>🔄 Новый фон:</label>
-                                <img src="${edit.background_path}" alt="Новый фон" loading="lazy" onerror="this.style.display='none'">
+                                <img src="${edit.background_path}" alt="Новый фон" style="max-width: 150px; max-height: 100px; object-fit: contain;" loading="lazy" onerror="this.style.display='none'">
                             </div>
                         ` : edit.background_path ? `
                             <div class="media-preview unchanged">
