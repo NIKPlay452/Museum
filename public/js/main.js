@@ -480,6 +480,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+// Эффект свечения при скролле
+window.addEventListener('scroll', () => {
+    const scrollY = window.scrollY;
+    const maxScroll = document.body.scrollHeight - window.innerHeight;
+    const progress = scrollY / maxScroll;
+    const hue = 180 + (progress * 180); // от 180 (cyan) до 360 (pink)
+    document.documentElement.style.setProperty('--neon-cyan', `hsl(${hue}, 100%, 55%)`);
+});
+
 // ============================================================================
 // ЭКСПОРТ
 // ============================================================================
