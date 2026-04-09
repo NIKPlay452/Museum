@@ -1385,23 +1385,23 @@ window.rejectExhibit = async (id) => {
 // ============================================================================
 
 async function logout() {
-    if (!confirm('Вы уверены, что хотите выйти?')) {
-        return;
-    }
-    
-    try {
-        fetch('/api/logout', { 
-            method: 'POST', 
-            credentials: 'include',
-        }).catch(() => {
-            console.log('Ошибка при выходе, но продолжаем');
-        });
-        
-        NotificationManager.show('Выход выполнен', 'info');
-        window.location.href = '/views/login.html';
-        
-    } catch (error) {
-        console.error('Ошибка:', error);
-        window.location.href = '/views/login.html';
-    }
+    showConfirmModal({
+        title: 'Выход из системы',
+        message: 'Вы уверены, что хотите выйти?',
+        confirmText: 'Выйти',
+        cancelText: 'Отмена',
+        onConfirm: async () => {
+            try {
+                await fetch('/api/logout', { 
+                    method: 'POST', 
+                    credentials: 'include',
+                });
+                NotificationManager.show('Выход выполнен', 'info');
+                window.location.href = '/views/login.html';
+            } catch (error) {
+                console.error('Ошибка:', error);
+                window.location.href = '/views/login.html';
+            }
+        }
+    });
 }
