@@ -128,7 +128,7 @@ async function sendEmail(to, subject, html) {
 }
 
 // ============================================================================
-// АВТОРИЗАЦИЯ (PostgreSQL версия)
+// АВТОРИЗАЦИЯ
 // ============================================================================
 
 app.post('/api/login', async (req, res) => {
@@ -208,14 +208,12 @@ app.post('/api/applications', async (req, res) => {
     }
     
     try {
-        // Проверка уникальности логина
         const existing = await db.query(`SELECT username FROM users WHERE username = $1`, [username]);
         
         if (existing.rows.length > 0) {
             return res.status(400).json({ error: 'Логин уже занят' });
         }
         
-        // Сохраняем заявку
         await db.query(
             `INSERT INTO applications (full_name, username, email, reason, status) 
              VALUES ($1, $2, $3, $4, 'pending')`,
@@ -224,7 +222,6 @@ app.post('/api/applications', async (req, res) => {
         
         console.log(`✅ Новая заявка от ${full_name} (${email})`);
         
-        // Уведомление администратору в Telegram
         const ADMIN_CHAT_ID = 5231666805;
         if (process.env.TELEGRAM_BOT_TOKEN) {
             try {
@@ -277,7 +274,9 @@ app.get('/api/exhibits/:id', async (req, res) => {
     const id = req.params.id;
     try {
         const result = await db.query(`SELECT * FROM exhibits WHERE id = $1`, [id]);
-        if (result.rows.length === 0) return res.status(404).json({ error: 'Экспонат не найден' });
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Экспонат не найден' });
+        }
         res.json(result.rows[0]);
     } catch (error) {
         console.error('❌ Ошибка загрузки экспоната:', error);
@@ -372,7 +371,9 @@ app.put('/api/exhibits/:id', authenticateToken, upload.fields([
     
     try {
         const oldExhibitResult = await db.query(`SELECT * FROM exhibits WHERE id = $1`, [exhibitId]);
-        if (oldExhibitResult.rows.length === 0) return res.status(404).json({ error: 'Экспонат не найден' });
+        if (oldExhibitResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Экспонат не найден' });
+        }
         
         const oldExhibit = oldExhibitResult.rows[0];
         let mediaUrl = oldExhibit.media_path;
@@ -420,19 +421,23 @@ app.put('/api/exhibits/:id', authenticateToken, upload.fields([
     }
 });
 
-app.delete('/api/admin/editors/:id', authenticateToken, isAdmin, async (req, res) => {
-    const editorId = parseInt(req.params.id);
+app.delete('/api/admin/exhibits/:id', authenticateToken, isAdmin, async (req, res) => {
+    const exhibitId = req.params.id;
+    
     try {
-        // Сначала обновляем экспонаты, созданные этим редактором (переназначаем админу)
-        await db.query(`UPDATE exhibits SET created_by = 1 WHERE created_by = $1`, [editorId]);
+        const exhibitCheck = await db.query(`SELECT * FROM exhibits WHERE id = $1`, [exhibitId]);
         
-        // Теперь удаляем редактора
-        await db.query(`DELETE FROM users WHERE id = $1 AND role = 'editor'`, [editorId]);
+        if (exhibitCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'Экспонат не найден' });
+        }
         
-        tempPasswords.delete(editorId);
-        res.json({ message: 'Редактор удален' });
+        await db.query(`DELETE FROM exhibits WHERE id = $1`, [exhibitId]);
+        
+        console.log(`✅ Экспонат ${exhibitId} удален`);
+        res.json({ message: 'Экспонат удален' });
+        
     } catch (error) {
-        console.error('❌ Ошибка удаления:', error);
+        console.error('❌ Ошибка удаления экспоната:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -472,7 +477,9 @@ app.post('/api/admin/approve/:id', authenticateToken, isAdmin, async (req, res) 
     
     try {
         const pendingResult = await db.query(`SELECT * FROM exhibits WHERE id = $1`, [exhibitId]);
-        if (pendingResult.rows.length === 0) return res.status(404).json({ error: 'Экспонат не найден' });
+        if (pendingResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Экспонат не найден' });
+        }
         
         const pendingExhibit = pendingResult.rows[0];
         
@@ -509,7 +516,7 @@ app.post('/api/admin/reject/:id', authenticateToken, isAdmin, async (req, res) =
 });
 
 // ============================================================================
-// РЕДАКТОРЫ (требуют доработки, но оставим как есть для совместимости)
+// РЕДАКТОРЫ
 // ============================================================================
 
 app.get('/api/admin/editors', authenticateToken, isAdmin, async (req, res) => {
@@ -561,9 +568,17 @@ app.post('/api/admin/editors', authenticateToken, isAdmin, async (req, res) => {
             } catch (e) { console.error('❌ Ошибка Telegram:', e.message); }
         }
         
-        res.json({ id: editorId, username, email: email || null, password, telegramSent });
+        let emailSent = false;
+        if (email?.trim()) {
+            const emailHtml = `<div>...</div>`;
+            emailSent = await sendEmail(email, '✅ Доступ в редакцию', emailHtml);
+        }
+        
+        res.json({ id: editorId, username, email: email || null, password, telegramSent, emailSent });
     } catch (error) {
-        if (error.message.includes('duplicate')) return res.status(400).json({ error: 'Имя пользователя уже занято' });
+        if (error.message.includes('duplicate')) {
+            return res.status(400).json({ error: 'Имя пользователя уже занято' });
+        }
         console.error('❌ Ошибка создания редактора:', error);
         res.status(500).json({ error: error.message });
     }
@@ -574,8 +589,12 @@ app.put('/api/admin/editors/:id', authenticateToken, isAdmin, async (req, res) =
     const { username, email, password } = req.body;
     
     try {
-        if (username) await db.query(`UPDATE users SET username = $1 WHERE id = $2 AND role = 'editor'`, [username, editorId]);
-        if (email !== undefined) await db.query(`UPDATE users SET email = $1 WHERE id = $2 AND role = 'editor'`, [email || null, editorId]);
+        if (username) {
+            await db.query(`UPDATE users SET username = $1 WHERE id = $2 AND role = 'editor'`, [username, editorId]);
+        }
+        if (email !== undefined) {
+            await db.query(`UPDATE users SET email = $1 WHERE id = $2 AND role = 'editor'`, [email || null, editorId]);
+        }
         if (password) {
             const salt = bcrypt.genSaltSync(10);
             const hash = bcrypt.hashSync(password, salt);
@@ -592,6 +611,7 @@ app.put('/api/admin/editors/:id', authenticateToken, isAdmin, async (req, res) =
 app.delete('/api/admin/editors/:id', authenticateToken, isAdmin, async (req, res) => {
     const editorId = parseInt(req.params.id);
     try {
+        await db.query(`UPDATE exhibits SET created_by = 1 WHERE created_by = $1`, [editorId]);
         await db.query(`DELETE FROM users WHERE id = $1 AND role = 'editor'`, [editorId]);
         tempPasswords.delete(editorId);
         res.json({ message: 'Редактор удален' });
@@ -619,7 +639,9 @@ app.get('/api/admin/applications/:id', authenticateToken, isAdmin, async (req, r
     const id = req.params.id;
     try {
         const result = await db.query(`SELECT * FROM applications WHERE id = $1`, [id]);
-        if (result.rows.length === 0) return res.status(404).json({ error: 'Заявка не найдена' });
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Заявка не найдена' });
+        }
         res.json(result.rows[0]);
     } catch (error) {
         console.error('❌ Ошибка загрузки заявки:', error);
@@ -632,14 +654,16 @@ app.post('/api/admin/applications/:id/approve', authenticateToken, isAdmin, asyn
     
     try {
         const appResult = await db.query(`SELECT * FROM applications WHERE id = $1`, [applicationId]);
-        if (appResult.rows.length === 0) return res.status(404).json({ error: 'Заявка не найдена' });
+        if (appResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Заявка не найдена' });
+        }
         
         const application = appResult.rows[0];
         await db.query(`UPDATE applications SET status = 'approved' WHERE id = $1`, [applicationId]);
         
         let emailSent = false;
         if (application.email) {
-            const emailHtml = `<div>... (ваш HTML) ...</div>`;
+            const emailHtml = `<div>...</div>`;
             emailSent = await sendEmail(application.email, '✅ Ваша заявка одобрена!', emailHtml);
         }
         
@@ -655,14 +679,16 @@ app.post('/api/admin/applications/:id/reject', authenticateToken, isAdmin, async
     
     try {
         const appResult = await db.query(`SELECT * FROM applications WHERE id = $1`, [applicationId]);
-        if (appResult.rows.length === 0) return res.status(404).json({ error: 'Заявка не найдена' });
+        if (appResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Заявка не найдена' });
+        }
         
         const application = appResult.rows[0];
         await db.query(`UPDATE applications SET status = 'rejected' WHERE id = $1`, [applicationId]);
         
         let emailSent = false;
         if (application.email) {
-            const emailHtml = `<div>... (ваш HTML) ...</div>`;
+            const emailHtml = `<div>...</div>`;
             emailSent = await sendEmail(application.email, '❌ Статус вашей заявки', emailHtml);
         }
         
@@ -674,7 +700,7 @@ app.post('/api/admin/applications/:id/reject', authenticateToken, isAdmin, async
 });
 
 // ============================================================================
-// УПРАВЛЕНИЕ СТИЛЯМИ (уже исправлено)
+// УПРАВЛЕНИЕ СТИЛЯМИ САЙТА
 // ============================================================================
 
 app.get('/api/site-styles', async (req, res) => {
@@ -744,7 +770,7 @@ app.get('/api/test', (req, res) => {
 });
 
 // ============================================================================
-// ОБРАБОТКА 404 И ОШИБОК
+// ОБРАБОТКА 404
 // ============================================================================
 
 app.use((req, res) => {
@@ -754,6 +780,10 @@ app.use((req, res) => {
         res.status(404).sendFile(path.join(__dirname, 'views', '404.html'));
     }
 });
+
+// ============================================================================
+// ОБРАБОТКА ОШИБОК
+// ============================================================================
 
 app.use((err, req, res, next) => {
     console.error('❌ Необработанная ошибка:', err);
