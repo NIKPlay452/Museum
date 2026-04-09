@@ -420,14 +420,19 @@ app.put('/api/exhibits/:id', authenticateToken, upload.fields([
     }
 });
 
-app.delete('/api/admin/exhibits/:id', authenticateToken, isAdmin, async (req, res) => {
-    const exhibitId = req.params.id;
-    
+app.delete('/api/admin/editors/:id', authenticateToken, isAdmin, async (req, res) => {
+    const editorId = parseInt(req.params.id);
     try {
-        await db.query(`DELETE FROM exhibits WHERE id = $1`, [exhibitId]);
-        res.json({ message: 'Экспонат удален' });
+        // Сначала обновляем экспонаты, созданные этим редактором (переназначаем админу)
+        await db.query(`UPDATE exhibits SET created_by = 1 WHERE created_by = $1`, [editorId]);
+        
+        // Теперь удаляем редактора
+        await db.query(`DELETE FROM users WHERE id = $1 AND role = 'editor'`, [editorId]);
+        
+        tempPasswords.delete(editorId);
+        res.json({ message: 'Редактор удален' });
     } catch (error) {
-        console.error('❌ Ошибка удаления экспоната:', error);
+        console.error('❌ Ошибка удаления:', error);
         res.status(500).json({ error: error.message });
     }
 });
