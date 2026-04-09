@@ -131,42 +131,72 @@ async function sendEmail(to, subject, html) {
 // АВТОРИЗАЦИЯ
 // ============================================================================
 
-app.post('/api/login', (req, res) => {
+app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
     console.log(`🔐 Попытка входа: ${username}`);
     
-    db.get(`SELECT * FROM users WHERE username = ?`, [username], (err, user) => {
-        if (err) {
-            console.error('❌ Ошибка БД:', err);
-            return res.status(500).json({ error: 'Ошибка сервера' });
-        }
+    try {
+        const result = await db.query(`SELECT * FROM users WHERE username = $1`, [username]);
+        const user = result.rows[0];
+        
         if (!user) {
             console.log('❌ Пользователь не найден');
             return res.status(401).json({ error: 'Неверный логин или пароль' });
         }
         
-        bcrypt.compare(password, user.password, (err, isValid) => {
-            if (err || !isValid) {
-                console.log('❌ Неверный пароль');
-                return res.status(401).json({ error: 'Неверный логин или пароль' });
-            }
-            
-            const token = jwt.sign(
-                { id: user.id, username: user.username, role: user.role },
-                JWT_SECRET,
-                { expiresIn: '7d' }
-            );
-            
-            res.cookie('token', token, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'lax',
-                maxAge: 7 * 24 * 60 * 60 * 1000
-            });
-            
-            res.json({ success: true, role: user.role });
+        const bcrypt = require('bcryptjs');
+        const isValid = bcrypt.compareSync(password, user.password);
+        
+        if (!isValid) {
+            console.log('❌ Неверный пароль');
+            return res.status(401).json({ error: 'Неверный логин или пароль' });
+        }
+        
+        const jwt = require('jsonwebtoken');
+        const token = jwt.sign(
+            { id: user.id, username: user.username, role: user.role },
+            JWT_SECRET,
+            { expiresIn: '7d' }
+        );
+        
+        res.cookie('token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 7 * 24 * 60 * 60 * 1000
         });
+        
+        res.json({ success: true, role: user.role });
+        
+    } catch (error) {
+        console.error('❌ Ошибка БД:', error);
+        res.status(500).json({ error: 'Ошибка сервера' });
+    }
+});
+
+app.post('/api/logout', (req, res) => {
+    res.clearCookie('token', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/'
     });
+    res.json({ success: true });
+});
+
+app.get('/api/me', async (req, res) => {
+    const token = req.cookies.token;
+    if (!token) {
+        return res.status(401).json({ error: 'Не авторизован' });
+    }
+    
+    try {
+        const jwt = require('jsonwebtoken');
+        const decoded = jwt.verify(token, JWT_SECRET);
+        res.json({ user: decoded });
+    } catch (err) {
+        res.status(401).json({ error: 'Не авторизован' });
+    }
 });
 
 app.post('/api/logout', (req, res) => {
@@ -181,8 +211,18 @@ app.post('/api/logout', (req, res) => {
     res.json({ success: true });
 });
 
-app.get('/api/me', authenticateToken, (req, res) => {
-    res.json({ user: req.user });
+app.get('/api/me', async (req, res) => {
+    const token = req.cookies.token;
+    if (!token) {
+        return res.status(401).json({ error: 'Не авторизован' });
+    }
+    
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        res.json({ user: decoded });
+    } catch (err) {
+        res.status(401).json({ error: 'Не авторизован' });
+    }
 });
 
 // ============================================================================
@@ -243,14 +283,14 @@ app.post('/api/applications', (req, res) => {
 // ЭКСПОНАТЫ
 // ============================================================================
 
-app.get('/api/exhibits', (req, res) => {
-    db.all(`SELECT * FROM exhibits WHERE status = 'approved' ORDER BY year ASC`, [], (err, rows) => {
-        if (err) {
-            console.error('❌ Ошибка загрузки экспонатов:', err);
-            return res.status(500).json({ error: 'Ошибка базы данных' });
-        }
-        res.json(rows || []);
-    });
+app.get('/api/exhibits', async (req, res) => {
+    try {
+        const exhibits = await db.all(`SELECT * FROM exhibits WHERE status = 'approved' ORDER BY year ASC`);
+        res.json(exhibits || []);
+    } catch (error) {
+        console.error('❌ Ошибка загрузки экспонатов:', error);
+        res.status(500).json({ error: 'Ошибка базы данных' });
+    }
 });
 
 app.get('/api/exhibits/all', authenticateToken, (req, res) => {

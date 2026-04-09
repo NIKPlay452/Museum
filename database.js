@@ -28,6 +28,12 @@ async function query(sql, params = []) {
     }
 }
 
+module.exports = { 
+    query,
+    get, all, run,
+    pool 
+};
+
 async function get(sql, params = []) {
     const result = await query(sql, params);
     return result.rows[0];
@@ -60,6 +66,11 @@ function runCallback(sql, params, callback) {
     run(sql, params)
         .then(result => callback(null, result))
         .catch(err => callback(err));
+}
+
+function convertSqliteToPostgres(sql) {
+    let index = 1;
+    return sql.replace(/\?/g, () => `$${index++}`);
 }
 
 module.exports = { 
