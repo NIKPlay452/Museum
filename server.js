@@ -812,6 +812,139 @@ app.post('/api/admin/applications/:id/approve', authenticateToken, isAdmin, (req
     });
 });
 
+// ============================================================================
+// УПРАВЛЕНИЕ СТИЛЯМИ САЙТА (глобальные настройки)
+// ============================================================================
+
+// Получить все настройки стилей (доступно всем)
+app.get('/api/site-styles', (req, res) => {
+    db.all(`SELECT setting_key, setting_value FROM site_settings ORDER BY setting_key`, [], (err, rows) => {
+        if (err) {
+            console.error('❌ Ошибка загрузки настроек стилей:', err);
+            return res.status(500).json({ error: err.message });
+        }
+        
+        const styles = {};
+        rows.forEach(row => {
+            styles[row.setting_key] = row.setting_value;
+        });
+        
+        res.json(styles);
+    });
+});
+
+// Обновить настройки стилей (только для админа)
+app.put('/api/admin/site-styles', authenticateToken, isAdmin, (req, res) => {
+    const { styles } = req.body;
+    const userId = req.user.id;
+    
+    if (!styles || typeof styles !== 'object') {
+        return res.status(400).json({ error: 'Неверный формат данных' });
+    }
+    
+    const updates = [];
+    const params = [];
+    
+    for (const [key, value] of Object.entries(styles)) {
+        updates.push(`UPDATE site_settings SET setting_value = ?, updated_at = CURRENT_TIMESTAMP, updated_by = ? WHERE setting_key = ?`);
+        params.push(value, userId, key);
+    }
+    
+    if (updates.length === 0) {
+        return res.status(400).json({ error: 'Нет данных для обновления' });
+    }
+    
+    // Используем транзакцию для атомарного обновления
+    db.serialize(() => {
+        db.run('BEGIN TRANSACTION');
+        
+        let completed = 0;
+        let hasError = false;
+        
+        updates.forEach((query, index) => {
+            db.run(query, params.slice(index * 3, (index + 1) * 3), (err) => {
+                if (err) {
+                    console.error('❌ Ошибка обновления настройки:', err);
+                    hasError = true;
+                    db.run('ROLLBACK');
+                    res.status(500).json({ error: err.message });
+                    return;
+                }
+                
+                completed++;
+                if (completed === updates.length && !hasError) {
+                    db.run('COMMIT', (commitErr) => {
+                        if (commitErr) {
+                            console.error('❌ Ошибка COMMIT:', commitErr);
+                            res.status(500).json({ error: commitErr.message });
+                        } else {
+                            console.log(`✅ Стили сайта обновлены пользователем ${req.user.username}`);
+                            res.json({ 
+                                success: true, 
+                                message: 'Стили успешно обновлены',
+                                styles: styles
+                            });
+                        }
+                    });
+                }
+            });
+        });
+    });
+});
+
+// Сбросить настройки стилей к значениям по умолчанию (только для админа)
+app.post('/api/admin/site-styles/reset', authenticateToken, isAdmin, (req, res) => {
+    const defaultStyles = {
+        'color_primary': '#c9a03d',
+        'color_primary_light': '#e0b354',
+        'color_primary_dark': '#b8860b',
+        'color_bg_dark': '#0a0c10',
+        'color_text_primary': '#ffffff',
+        'color_text_secondary': '#a0aab8',
+        'font_primary': "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+        'border_radius': '12px',
+        'transition_speed': '0.25s'
+    };
+    
+    const userId = req.user.id;
+    const updates = [];
+    const params = [];
+    
+    for (const [key, value] of Object.entries(defaultStyles)) {
+        updates.push(`UPDATE site_settings SET setting_value = ?, updated_at = CURRENT_TIMESTAMP, updated_by = ? WHERE setting_key = ?`);
+        params.push(value, userId, key);
+    }
+    
+    db.serialize(() => {
+        db.run('BEGIN TRANSACTION');
+        
+        let completed = 0;
+        let hasError = false;
+        
+        updates.forEach((query, index) => {
+            db.run(query, params.slice(index * 3, (index + 1) * 3), (err) => {
+                if (err) {
+                    hasError = true;
+                    db.run('ROLLBACK');
+                    res.status(500).json({ error: err.message });
+                    return;
+                }
+                
+                completed++;
+                if (completed === updates.length && !hasError) {
+                    db.run('COMMIT', (commitErr) => {
+                        if (commitErr) {
+                            res.status(500).json({ error: commitErr.message });
+                        } else {
+                            res.json({ success: true, message: 'Стили сброшены к значениям по умолчанию' });
+                        }
+                    });
+                }
+            });
+        });
+    });
+});
+
 app.post('/api/admin/applications/:id/reject', authenticateToken, isAdmin, (req, res) => {
     const applicationId = req.params.id;
     

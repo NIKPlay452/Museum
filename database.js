@@ -107,6 +107,58 @@ function initTables() {
             }
         });
 
+        // Таблица глобальных настроек стилей
+db.run(`CREATE TABLE IF NOT EXISTS site_settings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    setting_key TEXT UNIQUE NOT NULL,
+    setting_value TEXT,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_by INTEGER,
+    FOREIGN KEY (updated_by) REFERENCES users(id)
+)`, (err) => {
+    if (err) {
+        console.error('❌ Ошибка создания таблицы site_settings:', err);
+    } else {
+        console.log('✅ Таблица site_settings создана/проверена');
+        
+        // Инициализируем настройки стилей по умолчанию, если их нет
+        initDefaultStyleSettings();
+    }
+});
+
+// Функция инициализации настроек по умолчанию
+function initDefaultStyleSettings() {
+    const defaultStyles = {
+        'color_primary': '#c9a03d',
+        'color_primary_light': '#e0b354',
+        'color_primary_dark': '#b8860b',
+        'color_bg_dark': '#0a0c10',
+        'color_text_primary': '#ffffff',
+        'color_text_secondary': '#a0aab8',
+        'font_primary': "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+        'border_radius': '12px',
+        'transition_speed': '0.25s'
+    };
+    
+    for (const [key, value] of Object.entries(defaultStyles)) {
+        db.get(`SELECT * FROM site_settings WHERE setting_key = ?`, [key], (err, row) => {
+            if (err) {
+                console.error(`❌ Ошибка проверки настройки ${key}:`, err);
+                return;
+            }
+            if (!row) {
+                db.run(`INSERT INTO site_settings (setting_key, setting_value) VALUES (?, ?)`, [key, value], (err) => {
+                    if (err) {
+                        console.error(`❌ Ошибка создания настройки ${key}:`, err);
+                    } else {
+                        console.log(`✅ Создана настройка ${key} = ${value}`);
+                    }
+                });
+            }
+        });
+    }
+}
+
         console.log('✅ Все таблицы созданы/проверены.');
         
         // Создаем админа по умолчанию

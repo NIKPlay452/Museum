@@ -1,37 +1,26 @@
-/* ============================================
-   MUSEUM OF COMPUTER TECH - NEON REDESIGN
-   Theme: Cyberpunk / Holographic
-   ============================================ */
-
-/* ----- ИМПОРТ ШРИФТОВ ----- */
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
-
-/* ----- ПЕРЕМЕННЫЕ ----- */
+/* ----- БАЗОВЫЕ СТИЛИ И ПЕРЕМЕННЫЕ ----- */
 :root {
-    /* Основные цвета - темный фон с неоном */
-    --bg-primary: #05050A;
-    --bg-secondary: #0A0A14;
-    --bg-card: rgba(12, 12, 20, 0.75);
-    --bg-card-solid: #0C0C14;
+    --color-primary: #c9a03d;
+    --color-primary-light: #e0b354;
+    --color-primary-dark: #b8860b;
+    --color-bg-dark: #0a0c10;
+    --color-text-primary: #ffffff;
+    --color-text-secondary: #a0aab8;
+    --border-radius: 12px;
+    --transition-speed: 0.25s;
     
-    /* Неоновые акценты */
-    --neon-cyan: #00F0FF;
-    --neon-pink: #FF007F;
-    --neon-purple: #9D00FF;
-    --neon-gold: #FFD700;
-    --glow-cyan: 0 0 10px rgba(0, 240, 255, 0.5), 0 0 20px rgba(0, 240, 255, 0.3);
-    --glow-pink: 0 0 10px rgba(255, 0, 127, 0.5);
-    --glow-purple: 0 0 15px rgba(157, 0, 255, 0.6);
-    
-    /* Текст */
-    --text-primary: #E0E0FF;
-    --text-secondary: #A0A0C0;
-    --text-muted: #606080;
-    
-    /* Границы и эффекты */
-    --border-glow: 1px solid rgba(0, 240, 255, 0.3);
-    --glass-effect: blur(12px) saturate(180%);
-    --transition: all 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+    --color-bg-card: rgba(16, 20, 28, 0.85);
+    --color-bg-elevated: rgba(24, 30, 40, 0.95);
+    --color-text-muted: #6c7a8a;
+    --color-border: rgba(201, 160, 61, 0.25);
+    --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+    --transition-base: var(--transition-speed) ease;
+    --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.3);
+    --glass-border: 1px solid var(--color-border);
+    --color-bg-overlay: rgba(0, 0, 0, 0.8);
+    --transition-fast: 0.15s ease;
+    --color-border-light: rgba(255, 255, 255, 0.08);
 }
 
 * {
@@ -40,258 +29,175 @@
     box-sizing: border-box;
 }
 
+html {
+    scroll-behavior: smooth;
+}
+
 body {
-    font-family: 'Space Grotesk', sans-serif;
-    background: var(--bg-primary);
-    color: var(--text-primary);
+    font-family: var(--font-primary);
+    background-color: var(--color-bg-dark);
+    color: var(--color-text-primary);
     line-height: 1.6;
-    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden;
-    position: relative;
 }
 
-/* ----- АНИМИРОВАННЫЙ ФОН (СЕТКА + ШУМ) ----- */
-body::before {
-    content: '';
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-image: 
-        linear-gradient(var(--neon-cyan) 1px, transparent 1px),
-        linear-gradient(90deg, var(--neon-cyan) 1px, transparent 1px);
-    background-size: 50px 50px;
-    opacity: 0.05;
-    pointer-events: none;
-    z-index: 0;
-}
-
-body::after {
-    content: '';
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: radial-gradient(circle at 20% 40%, rgba(0, 240, 255, 0.08), transparent 60%);
-    pointer-events: none;
-    z-index: 0;
-}
-
+/* Фоновый элемент с эффектом */
 .background-overlay {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background-size: cover;
-    background-position: center;
-    opacity: 0.15;
-    filter: blur(8px) brightness(0.5);
+    background-image: radial-gradient(circle at 10% 20%, rgba(201, 160, 61, 0.08) 0%, rgba(0, 0, 0, 0.95) 90%);
     pointer-events: none;
-    z-index: 0;
-    transition: opacity 0.5s ease;
-    mix-blend-mode: overlay;
+    z-index: -1;
 }
 
-/* ----- ШАПКА С НЕОНОМ ----- */
+/* ----- НАВИГАЦИЯ ----- */
 .site-header {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
-    padding: 1rem 2.5rem;
-    background: rgba(5, 5, 10, 0.8);
-    backdrop-filter: var(--glass-effect);
-    border-bottom: var(--border-glow);
     z-index: 1000;
+    padding: 0.75rem 2rem;
+    background: rgba(10, 12, 16, 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: var(--glass-border);
+    transition: var(--transition-base);
+}
+
+.nav-container {
+    max-width: 1400px;
+    margin: 0 auto;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    box-shadow: 0 0 20px rgba(0, 240, 255, 0.1);
+    gap: 2rem;
 }
 
-@media (max-width: 768px) {
-    .site-header {
-        padding: 0.8rem 1.2rem;
-    }
-}
-
-.home-link {
-    font-family: 'Orbitron', monospace;
+.logo a {
+    font-family: var(--font-mono);
+    font-size: 1.25rem;
     font-weight: 600;
+    letter-spacing: -0.5px;
+    text-decoration: none;
+    background: linear-gradient(135deg, #fff, var(--color-primary-light));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.nav-links {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.nav-links a {
+    color: var(--color-text-secondary);
+    text-decoration: none;
     font-size: 0.9rem;
-    text-decoration: none;
-    color: var(--neon-cyan);
-    padding: 0.5rem 1.2rem;
-    border: 1px solid var(--neon-cyan);
-    border-radius: 40px;
-    background: rgba(0, 240, 255, 0.05);
-    transition: var(--transition);
-    letter-spacing: 1px;
-    backdrop-filter: blur(4px);
+    font-weight: 500;
+    transition: var(--transition-fast);
+    position: relative;
 }
 
-.home-link:hover {
-    background: var(--neon-cyan);
-    color: var(--bg-primary);
-    box-shadow: var(--glow-cyan);
-    text-shadow: none;
-    transform: translateY(-2px);
+.nav-links a:hover {
+    color: var(--color-text-primary);
 }
 
-.btn-login {
-    font-family: 'Orbitron', monospace;
-    padding: 0.5rem 1.5rem;
-    border-radius: 40px;
-    text-decoration: none;
-    font-weight: 600;
-    font-size: 0.85rem;
-    background: transparent;
-    border: 1px solid var(--neon-pink);
-    color: var(--neon-pink);
-    transition: var(--transition);
-    letter-spacing: 1px;
+.nav-links a::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background: var(--color-primary);
+    transition: var(--transition-base);
 }
 
-.btn-login:hover {
-    background: var(--neon-pink);
-    color: var(--bg-primary);
-    box-shadow: var(--glow-pink);
-    transform: translateY(-2px);
+.nav-links a:hover::after {
+    width: 100%;
 }
 
-.btn-login.logged-in {
-    border-color: var(--neon-cyan);
-    color: var(--neon-cyan);
-}
-
-.btn-login.logged-in:hover {
-    background: var(--neon-cyan);
-    color: var(--bg-primary);
-    box-shadow: var(--glow-cyan);
-}
-
-.header-right {
+.header-actions {
     display: flex;
     align-items: center;
     gap: 1rem;
 }
 
-.user-badge {
-    font-family: 'Orbitron', monospace;
-    font-size: 0.75rem;
-    padding: 0.3rem 0.8rem;
-    background: rgba(0, 240, 255, 0.1);
-    border: 1px solid var(--neon-cyan);
+/* Кнопки входа/профиля */
+.btn-outline {
+    padding: 0.5rem 1.25rem;
     border-radius: 40px;
-    color: var(--neon-cyan);
-    letter-spacing: 1px;
-}
-
-.btn-logout {
-    font-family: 'Orbitron', monospace;
-    background: rgba(255, 0, 127, 0.1);
-    border: 1px solid var(--neon-pink);
-    color: var(--neon-pink);
-    padding: 0.4rem 1rem;
-    border-radius: 40px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: var(--transition-fast);
+    border: 1px solid var(--color-border);
+    background: transparent;
+    color: var(--color-text-primary);
     cursor: pointer;
-    font-weight: 600;
-    font-size: 0.75rem;
-    transition: var(--transition);
 }
 
-.btn-logout:hover {
-    background: var(--neon-pink);
-    color: var(--bg-primary);
-    box-shadow: var(--glow-pink);
+.btn-outline:hover {
+    border-color: var(--color-primary);
+    background: rgba(201, 160, 61, 0.1);
+    transform: translateY(-1px);
 }
 
-/* ----- КОНТЕЙНЕРЫ С ЭФФЕКТОМ СТЕКЛА ----- */
-.container, .admin-container {
+.user-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.8rem;
+    background: rgba(201, 160, 61, 0.15);
+    border-radius: 40px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--color-primary-light);
+}
+
+/* ----- ОСНОВНОЙ КОНТЕЙНЕР ----- */
+.container {
     max-width: 1400px;
-    margin: 6rem auto 2rem;
-    padding: 0 2rem;
-    position: relative;
-    z-index: 2;
+    margin: 0 auto;
+    padding: 6rem 2rem 3rem;
 }
 
-@media (max-width: 768px) {
-    .container, .admin-container {
-        margin: 5rem auto 1rem;
-        padding: 0 1rem;
-    }
-}
-
-/* ----- ЗАГОЛОВКИ С НЕОНОМ ----- */
-.site-title {
-    font-family: 'Orbitron', monospace;
-    font-size: clamp(1.8rem, 6vw, 3.5rem);
+/* ----- ХРОНОЛОГИЯ (ГЛАВНАЯ) ----- */
+.timeline-header {
     text-align: center;
-    margin-bottom: 3rem;
-    font-weight: 800;
-    background: linear-gradient(135deg, var(--neon-cyan), var(--neon-purple), var(--neon-pink));
+    margin-bottom: 4rem;
+}
+
+.timeline-header h1 {
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    font-weight: 700;
+    letter-spacing: -1px;
+    background: linear-gradient(135deg, #fff, var(--color-primary-light));
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
-    text-transform: uppercase;
-    letter-spacing: 4px;
-    position: relative;
-    animation: titlePulse 3s ease-in-out infinite;
+    margin-bottom: 1rem;
 }
 
-@keyframes titlePulse {
-    0%, 100% { opacity: 1; text-shadow: 0 0 5px rgba(0,240,255,0.3); }
-    50% { opacity: 0.95; text-shadow: 0 0 20px rgba(0,240,255,0.6); }
+.timeline-header p {
+    color: var(--color-text-secondary);
+    max-width: 600px;
+    margin: 0 auto;
 }
 
-.site-title::after {
-    content: '';
-    position: absolute;
-    bottom: -20px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 120px;
-    height: 3px;
-    background: linear-gradient(90deg, transparent, var(--neon-cyan), var(--neon-purple), transparent);
-    border-radius: 2px;
-}
-
-.admin-title {
-    font-family: 'Orbitron', monospace;
-    font-size: clamp(1.5rem, 4vw, 2.2rem);
-    text-align: center;
-    background: linear-gradient(135deg, var(--neon-cyan), var(--neon-pink));
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    margin-bottom: 2rem;
-    letter-spacing: 2px;
-}
-
-/* ----- ВРЕМЕННАЯ ШКАЛА (ГОЛОГРАФИЧЕСКАЯ) ----- */
 .timeline-container {
     position: relative;
-    padding: 3rem 0;
-    margin: 2rem 0;
+    margin: 3rem 0;
     overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin;
-    scrollbar-color: var(--neon-cyan) var(--bg-secondary);
-}
-
-.timeline-container::-webkit-scrollbar {
-    height: 4px;
-}
-.timeline-container::-webkit-scrollbar-track {
-    background: var(--bg-secondary);
-}
-.timeline-container::-webkit-scrollbar-thumb {
-    background: var(--neon-cyan);
-    border-radius: 4px;
-    box-shadow: var(--glow-cyan);
+    padding-bottom: 1rem;
 }
 
 .timeline-line {
@@ -300,96 +206,75 @@ body::after {
     left: 0;
     width: 100%;
     height: 2px;
-    background: linear-gradient(90deg, transparent, var(--neon-cyan), var(--neon-purple), var(--neon-pink), transparent);
+    background: linear-gradient(90deg, transparent, var(--color-primary), var(--color-primary-dark), transparent);
     transform: translateY(-50%);
-    border-radius: 2px;
-    box-shadow: 0 0 8px rgba(0,240,255,0.5);
 }
 
 .timeline-points {
-    position: relative;
     display: flex;
-    justify-content: space-around;
-    align-items: center;
-    z-index: 2;
+    justify-content: space-between;
+    position: relative;
     min-width: 600px;
     gap: 1rem;
 }
 
 .timeline-point {
-    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
+    gap: 0.5rem;
     cursor: pointer;
-    padding: 0.8rem 1rem;
-    background: var(--bg-card);
-    backdrop-filter: blur(8px);
-    border-radius: 60px;
-    border: 1px solid rgba(0, 240, 255, 0.2);
-    transition: var(--transition);
-    min-width: 80px;
+    transition: var(--transition-base);
+    padding: 0.5rem;
+    border-radius: 12px;
+    background: rgba(16, 20, 28, 0.5);
+    backdrop-filter: blur(4px);
+    min-width: 70px;
 }
 
 .timeline-point:hover {
-    transform: translateY(-5px);
-    border-color: var(--neon-cyan);
-    box-shadow: var(--glow-cyan);
-    background: rgba(0, 240, 255, 0.1);
+    transform: translateY(-4px);
+    background: rgba(201, 160, 61, 0.15);
 }
 
 .timeline-point .year {
-    font-family: 'Orbitron', monospace;
-    font-weight: 700;
-    font-size: clamp(0.9rem, 2vw, 1.1rem);
-    margin-bottom: 0.3rem;
-    color: var(--neon-cyan);
-    letter-spacing: 1px;
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--color-primary);
 }
 
 .timeline-point .dot {
     width: 8px;
     height: 8px;
-    background: var(--neon-cyan);
+    background: var(--color-primary);
     border-radius: 50%;
-    transition: var(--transition);
-    box-shadow: var(--glow-cyan);
-}
-
-.timeline-point:hover .dot {
-    transform: scale(1.8);
-    background: var(--neon-pink);
-    box-shadow: var(--glow-pink);
-}
-
-.timeline-point.active {
-    border-color: var(--neon-pink);
-    box-shadow: var(--glow-pink);
+    transition: var(--transition-base);
+    box-shadow: 0 0 6px var(--color-primary);
 }
 
 .timeline-point.active .dot {
-    background: var(--neon-pink);
     transform: scale(1.5);
-    box-shadow: var(--glow-pink);
+    background: var(--color-primary-light);
+    box-shadow: 0 0 12px var(--color-primary-light);
 }
 
-/* ----- ДЕТАЛИ ЭКСПОНАТА (ГОЛОГРАФИЧЕСКАЯ КАРТА) ----- */
+/* Карточка экспоната */
 .exhibit-details {
-    background: var(--bg-card);
+    background: var(--color-bg-card);
     backdrop-filter: blur(16px);
-    border: 1px solid rgba(0, 240, 255, 0.3);
-    border-radius: 32px;
+    -webkit-backdrop-filter: blur(16px);
+    border: var(--glass-border);
+    border-radius: 24px;
     padding: 2rem;
     margin-top: 2rem;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 30px rgba(0, 240, 255, 0.1);
-    position: relative;
-    animation: fadeInUp 0.5s ease-out;
+    animation: fadeInUp 0.4s cubic-bezier(0.2, 0.9, 0.4, 1.1);
 }
 
 @keyframes fadeInUp {
     from {
         opacity: 0;
-        transform: translateY(30px);
+        transform: translateY(20px);
     }
     to {
         opacity: 1;
@@ -397,272 +282,166 @@ body::after {
     }
 }
 
-.close-details {
-    position: absolute;
-    top: 1rem;
-    right: 1.5rem;
-    background: none;
-    border: none;
-    color: var(--text-muted);
-    font-size: 2rem;
-    cursor: pointer;
-    transition: var(--transition);
-    line-height: 1;
-}
-
-.close-details:hover {
-    color: var(--neon-pink);
-    transform: rotate(90deg) scale(1.1);
-}
-
 .exhibit-content {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 2.5rem;
+    gap: 2rem;
 }
 
 @media (max-width: 768px) {
     .exhibit-content {
         grid-template-columns: 1fr;
-        gap: 1.5rem;
     }
 }
 
 .exhibit-media {
-    min-height: 280px;
-    border-radius: 24px;
+    background: var(--color-bg-dark);
+    border-radius: 16px;
     overflow: hidden;
-    background: #000;
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid var(--neon-cyan);
-    box-shadow: 0 0 20px rgba(0, 240, 255, 0.2);
+    min-height: 250px;
 }
 
 .exhibit-media img,
 .exhibit-media video {
-    width: 100%;
-    height: auto;
-    max-height: 400px;
+    max-width: 100%;
+    max-height: 350px;
     object-fit: contain;
-    transition: transform 0.4s ease;
-}
-
-.exhibit-media:hover img,
-.exhibit-media:hover video {
-    transform: scale(1.03);
 }
 
 .exhibit-info h2 {
-    font-family: 'Orbitron', monospace;
-    font-size: clamp(1.5rem, 4vw, 2.2rem);
-    background: linear-gradient(135deg, var(--neon-cyan), var(--neon-purple));
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+    font-size: 1.8rem;
     margin-bottom: 0.5rem;
+    color: var(--color-primary);
 }
 
 .exhibit-year {
-    font-family: 'Orbitron', monospace;
-    font-size: 1.1rem;
-    color: var(--neon-pink);
+    font-family: var(--font-mono);
+    color: var(--color-primary-light);
     margin-bottom: 1rem;
-    letter-spacing: 2px;
+    font-size: 0.9rem;
 }
 
 .exhibit-description {
-    line-height: 1.8;
-    font-size: 1rem;
-    color: var(--text-secondary);
+    color: var(--color-text-secondary);
+    line-height: 1.7;
 }
 
-/* ----- СТРАНИЦА ВХОДА (НЕОНОВАЯ) ----- */
-.login-page {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 100vh;
-    background: radial-gradient(circle at center, #0A0A14 0%, #05050A 100%);
-    position: relative;
+/* ----- СТРАНИЦА "О НАС" ----- */
+.about-section {
+    max-width: 800px;
+    margin: 0 auto;
+    text-align: center;
 }
 
-.login-page::before {
-    content: '';
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    background: radial-gradient(circle at 50% 50%, rgba(0, 240, 255, 0.1), transparent 70%);
-    pointer-events: none;
+.about-section h1 {
+    font-size: 2.5rem;
+    margin-bottom: 2rem;
+    color: var(--color-primary);
 }
 
-.login-container {
-    background: var(--bg-card);
-    backdrop-filter: blur(20px);
-    padding: 2.5rem;
-    border-radius: 48px;
-    border: 1px solid var(--neon-cyan);
-    box-shadow: 0 0 50px rgba(0, 240, 255, 0.2), 0 10px 30px rgba(0, 0, 0, 0.5);
-    width: 100%;
-    max-width: 440px;
-    transition: var(--transition);
-    z-index: 2;
+.about-card {
+    background: var(--color-bg-card);
+    backdrop-filter: blur(16px);
+    border: var(--glass-border);
+    border-radius: 24px;
+    padding: 2rem;
+    text-align: left;
+    margin-bottom: 2rem;
 }
 
-.login-container:hover {
-    transform: translateY(-5px);
-    border-color: var(--neon-pink);
-    box-shadow: 0 0 60px rgba(255, 0, 127, 0.2);
+.about-card h2 {
+    margin-bottom: 1rem;
+    color: var(--color-primary-light);
 }
 
-.login-form h2 {
-    font-family: 'Orbitron', monospace;
+.about-card p {
+    color: var(--color-text-secondary);
+    margin-bottom: 1rem;
+}
+
+/* ----- АДМИН-ПАНЕЛЬ ----- */
+.admin-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 6rem 2rem 3rem;
+}
+
+.admin-title {
+    font-size: 2rem;
     text-align: center;
     margin-bottom: 2rem;
-    background: linear-gradient(135deg, var(--neon-cyan), var(--neon-pink));
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    font-size: 1.8rem;
-    letter-spacing: 2px;
+    color: var(--color-primary);
 }
 
-/* ----- ФОРМЫ ----- */
-.form-group {
-    margin-bottom: 1.5rem;
-}
-
-.form-group label {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-family: 'Orbitron', monospace;
-    color: var(--neon-cyan);
-    font-size: 0.8rem;
-    letter-spacing: 1px;
-}
-
-.form-group input,
-.form-group textarea,
-.form-group select {
-    width: 100%;
-    padding: 0.8rem 1rem;
-    background: rgba(0, 0, 0, 0.6);
-    border: 1px solid var(--text-muted);
-    border-radius: 16px;
-    color: var(--text-primary);
-    font-size: 0.95rem;
-    transition: var(--transition);
-    font-family: 'Space Grotesk', sans-serif;
-}
-
-.form-group input:focus,
-.form-group textarea:focus,
-.form-group select:focus {
-    outline: none;
-    border-color: var(--neon-cyan);
-    box-shadow: 0 0 15px rgba(0, 240, 255, 0.2);
-}
-
-/* ----- КНОПКИ С НЕОНОМ ----- */
-.submit-btn,
-.login-form button {
-    width: 100%;
-    padding: 0.9rem;
-    background: transparent;
-    border: 1px solid var(--neon-cyan);
-    border-radius: 60px;
-    color: var(--neon-cyan);
-    font-family: 'Orbitron', monospace;
-    font-weight: 600;
-    font-size: 1rem;
-    cursor: pointer;
-    transition: var(--transition);
-    margin-top: 0.5rem;
-    letter-spacing: 1px;
-}
-
-.submit-btn:hover,
-.login-form button:hover {
-    background: var(--neon-cyan);
-    color: var(--bg-primary);
-    box-shadow: var(--glow-cyan);
-    transform: translateY(-2px);
-}
-
-/* ----- АДМИН ПАНЕЛЬ (КИБЕРПАНК) ----- */
 .admin-buttons {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 1.2rem;
-    margin: 2rem 0;
+    gap: 1rem;
+    margin-bottom: 2rem;
 }
 
 .admin-btn {
-    padding: 1rem 0.5rem;
-    background: var(--bg-card-solid);
-    border: 1px solid var(--text-muted);
-    border-radius: 60px;
-    color: var(--text-primary);
-    font-family: 'Orbitron', monospace;
-    font-size: 0.9rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: var(--transition);
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.8rem;
-    letter-spacing: 1px;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: var(--color-bg-card);
+    border: var(--glass-border);
+    border-radius: 12px;
+    color: var(--color-text-primary);
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition-base);
 }
 
 .admin-btn:hover {
-    border-color: var(--neon-cyan);
-    color: var(--neon-cyan);
-    transform: translateY(-3px);
-    box-shadow: 0 5px 15px rgba(0, 240, 255, 0.2);
+    border-color: var(--color-primary);
+    transform: translateY(-2px);
+    background: rgba(201, 160, 61, 0.1);
 }
 
-.btn-icon {
-    font-size: 1.2rem;
-}
-
-/* ----- МОДАЛЬНЫЕ ОКНА (ГОЛОГРАФИЧЕСКИЕ) ----- */
+/* ----- ФОРМЫ И МОДАЛЬНЫЕ ОКНА ----- */
 .modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.85);
+    background: var(--color-bg-overlay);
     backdrop-filter: blur(8px);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 2000;
-    padding: 1rem;
     animation: fadeIn 0.2s ease;
 }
 
 .modal-content {
-    background: var(--bg-secondary);
-    border: 1px solid var(--neon-cyan);
-    border-radius: 32px;
+    background: var(--color-bg-elevated);
+    border: var(--glass-border);
+    border-radius: 24px;
     padding: 2rem;
-    max-width: 900px;
-    width: 100%;
+    max-width: 90vw;
     max-height: 85vh;
     overflow-y: auto;
     position: relative;
-    box-shadow: 0 0 40px rgba(0, 240, 255, 0.2);
     animation: modalSlideIn 0.3s cubic-bezier(0.34, 1.2, 0.64, 1);
 }
 
-.modal-content h2 {
-    font-family: 'Orbitron', monospace;
-    color: var(--neon-cyan);
-    margin-bottom: 1.5rem;
-    font-size: 1.5rem;
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
 }
 
 .modal-close {
@@ -671,147 +450,90 @@ body::after {
     right: 1.5rem;
     background: none;
     border: none;
-    color: var(--text-muted);
-    font-size: 2rem;
+    font-size: 1.5rem;
     cursor: pointer;
-    transition: var(--transition);
+    color: var(--color-text-muted);
+    transition: var(--transition-fast);
 }
 
 .modal-close:hover {
-    color: var(--neon-pink);
+    color: var(--color-primary);
     transform: rotate(90deg);
 }
 
-/* ----- КАРТОЧКИ В МОДАЛКАХ ----- */
-.exhibit-card, .editor-card, .application-card {
-    background: var(--bg-card-solid);
-    border: 1px solid var(--text-muted);
-    border-radius: 20px;
-    padding: 1rem;
-    margin-bottom: 1rem;
-    transition: var(--transition);
+.form-group {
+    margin-bottom: 1.25rem;
 }
 
-.exhibit-card:hover, .editor-card:hover, .application-card:hover {
-    border-color: var(--neon-cyan);
-    transform: translateX(5px);
-    box-shadow: 0 0 15px rgba(0, 240, 255, 0.1);
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: var(--color-primary-light);
 }
 
-.approve-btn {
+.form-group input,
+.form-group textarea,
+.form-group select {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: var(--color-bg-dark);
+    border: 1px solid var(--color-border-light);
+    border-radius: 12px;
+    color: var(--color-text-primary);
+    font-family: inherit;
+    transition: var(--transition-fast);
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(201, 160, 61, 0.2);
+}
+
+.submit-btn {
+    width: 100%;
+    padding: 0.85rem;
     background: transparent;
-    border: 1px solid var(--neon-cyan);
-    color: var(--neon-cyan);
-    padding: 0.4rem 1rem;
+    border: 1px solid var(--color-primary);
     border-radius: 40px;
+    color: var(--color-primary);
+    font-weight: 600;
     cursor: pointer;
-    transition: var(--transition);
+    transition: var(--transition-base);
 }
 
-.approve-btn:hover {
-    background: var(--neon-cyan);
-    color: var(--bg-primary);
-}
-
-.reject-btn, .delete-editor {
-    background: transparent;
-    border: 1px solid var(--neon-pink);
-    color: var(--neon-pink);
-    padding: 0.4rem 1rem;
-    border-radius: 40px;
-    cursor: pointer;
-    transition: var(--transition);
-}
-
-.reject-btn:hover, .delete-editor:hover {
-    background: var(--neon-pink);
-    color: var(--bg-primary);
-}
-
-/* ----- FLOATING BUTTONS (НЕОН) ----- */
-.fab-button {
-    position: fixed;
-    bottom: 2rem;
-    width: 52px;
-    height: 52px;
-    background: var(--bg-card);
-    backdrop-filter: blur(8px);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-    z-index: 1000;
-    transition: var(--transition);
-    border: 1px solid var(--neon-cyan);
-    text-decoration: none;
-}
-
-.fab-button:hover {
-    transform: scale(1.15);
-    box-shadow: var(--glow-cyan);
-}
-
-.fab-telegram {
-    left: 2rem;
-}
-
-.fab-telegram:hover {
-    background: #0088cc;
-    border-color: #0088cc;
-}
-
-.fab-telegram svg {
-    fill: var(--neon-cyan);
-    width: 26px;
-    height: 26px;
-}
-
-.fab-telegram:hover svg {
-    fill: white;
-}
-
-.fab-yandex {
-    left: calc(2rem + 70px);
-}
-
-.fab-yandex:hover {
-    background: #ff3d00;
-    border-color: #ff3d00;
-}
-
-.fab-yandex svg {
-    fill: var(--neon-cyan);
-}
-
-.fab-yandex:hover svg {
-    fill: white;
+.submit-btn:hover {
+    background: var(--color-primary);
+    color: var(--color-bg-dark);
+    transform: translateY(-2px);
 }
 
 /* ----- УВЕДОМЛЕНИЯ ----- */
 #notification-container {
     position: fixed;
-    top: 5rem;
-    right: 1.5rem;
+    bottom: 2rem;
+    right: 2rem;
     z-index: 9999;
     display: flex;
     flex-direction: column;
-    gap: 0.8rem;
+    gap: 0.75rem;
 }
 
-#notification-container > div {
-    padding: 0.8rem 1.5rem;
-    border-radius: 60px;
-    background: var(--bg-card);
-    backdrop-filter: blur(12px);
-    border-left: 4px solid;
-    font-family: 'Orbitron', monospace;
-    font-size: 0.85rem;
-    animation: slideIn 0.3s ease;
-    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+.notification {
+    padding: 0.75rem 1.5rem;
+    background: var(--color-bg-elevated);
+    border-left: 3px solid;
+    border-radius: 12px;
+    backdrop-filter: blur(8px);
+    font-size: 0.9rem;
+    animation: slideInRight 0.3s ease;
+    box-shadow: var(--shadow-md);
 }
 
-@keyframes slideIn {
+@keyframes slideInRight {
     from {
         opacity: 0;
         transform: translateX(100%);
@@ -822,25 +544,110 @@ body::after {
     }
 }
 
-/* ----- АДАПТАЦИЯ ----- */
+/* ----- АДАПТИВНОСТЬ ----- */
+@media (max-width: 768px) {
+    .site-header {
+        padding: 0.5rem 1rem;
+    }
+    
+    .nav-container {
+        flex-wrap: wrap;
+        gap: 0.75rem;
+    }
+    
+    .nav-links {
+        order: 3;
+        width: 100%;
+        justify-content: center;
+        gap: 1rem;
+    }
+    
+    .container,
+    .admin-container {
+        padding: 5rem 1rem 2rem;
+    }
+    
+    .timeline-points {
+        min-width: 500px;
+    }
+}
+
+/* ----- КНОПКИ FAB ----- */
+.fab-button {
+    position: fixed;
+    bottom: 2rem;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--color-bg-card);
+    backdrop-filter: blur(8px);
+    border: var(--glass-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition-base);
+    cursor: pointer;
+    z-index: 100;
+}
+
+.fab-button:hover {
+    transform: scale(1.1);
+    border-color: var(--color-primary);
+}
+
+.fab-telegram {
+    left: 2rem;
+}
+
+.fab-yandex {
+    left: calc(2rem + 64px);
+}
+
 @media (max-width: 768px) {
     .fab-telegram {
         left: 1rem;
     }
     .fab-yandex {
-        left: calc(1rem + 60px);
+        left: calc(1rem + 56px);
     }
 }
 
-/* СКРОЛЛБАР */
-::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+/* Режим редактирования стилей (админка) */
+.style-editor-panel {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    width: 320px;
+    background: var(--color-bg-elevated);
+    border: var(--glass-border);
+    border-radius: 20px;
+    padding: 1rem;
+    z-index: 1500;
+    backdrop-filter: blur(16px);
+    box-shadow: var(--shadow-lg);
 }
-::-webkit-scrollbar-track {
-    background: var(--bg-secondary);
+
+.style-editor-panel h3 {
+    margin-bottom: 1rem;
+    font-size: 1rem;
 }
-::-webkit-scrollbar-thumb {
-    background: var(--neon-cyan);
-    border-radius: 3px;
+
+.style-control {
+    margin-bottom: 0.75rem;
+}
+
+.style-control label {
+    display: block;
+    font-size: 0.8rem;
+    margin-bottom: 0.25rem;
+    color: var(--color-text-secondary);
+}
+
+.style-control input {
+    width: 100%;
+    padding: 0.4rem;
+    background: var(--color-bg-dark);
+    border: 1px solid var(--color-border-light);
+    border-radius: 8px;
+    color: white;
 }

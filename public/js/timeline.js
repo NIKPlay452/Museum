@@ -82,11 +82,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     
     // Закрыть детали
-    if (closeBtn) {
-        closeBtn.addEventListener('click', () => {
-            exhibitDetails.style.display = 'none';
+if (closeBtn) {
+    closeBtn.addEventListener('click', () => {
+        exhibitDetails.style.display = 'none';
+        if (overlay) {
             overlay.style.backgroundImage = '';
             overlay.style.opacity = '0.15';
-        });
-    }
+        }
+    });
+}
 });

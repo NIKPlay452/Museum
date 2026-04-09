@@ -69,30 +69,27 @@ const NotificationManager = {
         }
         
         const colors = {
-            success: '#c9a03d',
+            success: 'var(--color-primary)',
             error: '#e06c75',
-            info: '#5a6e8a'
+            info: 'var(--color-text-secondary)'
         };
         
         const notification = document.createElement('div');
-        notification.style.cssText = `
-            background: ${colors[type]};
-            color: ${type === 'info' ? '#fff' : '#0a0c12'};
-            border-left-color: ${colors[type]};
-        `;
+        notification.className = 'notification';
+        notification.style.borderLeftColor = colors[type];
         notification.textContent = message;
         
         container.appendChild(notification);
         
         notification.addEventListener('click', () => {
-            notification.style.animation = 'slideOut 0.3s ease';
-            setTimeout(() => notification.remove(), 300);
+            notification.style.animation = 'fadeOut 0.2s ease';
+            setTimeout(() => notification.remove(), 200);
         });
         
         setTimeout(() => {
             if (notification.parentNode) {
-                notification.style.animation = 'slideOut 0.3s ease';
-                setTimeout(() => notification.remove(), 300);
+                notification.style.animation = 'fadeOut 0.2s ease';
+                setTimeout(() => notification.remove(), 200);
             }
         }, duration);
     }
@@ -198,7 +195,7 @@ class FileUploader {
                     fileName.textContent = file.name;
                     fileName.style.marginTop = '5px';
                     fileName.style.fontSize = '0.8rem';
-                    fileName.style.color = 'var(--primary)';
+                    fileName.style.color = 'var(--color-primary)';
                     
                     preview.appendChild(img);
                     preview.appendChild(fileName);
@@ -217,7 +214,7 @@ class FileUploader {
                 fileName.textContent = file.name;
                 fileName.style.marginTop = '5px';
                 fileName.style.fontSize = '0.8rem';
-                fileName.style.color = 'var(--primary)';
+                fileName.style.color = 'var(--color-primary)';
                 
                 preview.appendChild(video);
                 preview.appendChild(fileName);
@@ -253,20 +250,20 @@ class FileUploader {
         
         uploadArea.addEventListener('dragover', (e) => {
             e.preventDefault();
-            uploadArea.style.borderColor = 'var(--primary)';
+            uploadArea.style.borderColor = 'var(--color-primary)';
             uploadArea.style.background = 'rgba(201, 160, 61, 0.1)';
         });
         
         uploadArea.addEventListener('dragleave', (e) => {
             e.preventDefault();
-            uploadArea.style.borderColor = 'var(--border)';
-            uploadArea.style.background = '#0a0c12';
+            uploadArea.style.borderColor = 'var(--color-border)';
+            uploadArea.style.background = 'var(--color-bg-dark)';
         });
         
         uploadArea.addEventListener('drop', (e) => {
             e.preventDefault();
-            uploadArea.style.borderColor = 'var(--border)';
-            uploadArea.style.background = '#0a0c12';
+            uploadArea.style.borderColor = 'var(--color-border)';
+            uploadArea.style.background = 'var(--color-bg-dark)';
             
             const file = e.dataTransfer.files[0];
             if (!file) return;
@@ -303,7 +300,7 @@ function createModal(options = {}) {
     
     modal.innerHTML = `
         <button class="modal-close">&times;</button>
-        <h2 style="color: var(--primary); margin-bottom: 1.5rem; font-size: 1.5rem;">${title}</h2>
+        <h2 style="color: var(--color-primary); margin-bottom: 1.5rem; font-size: 1.5rem;">${title}</h2>
         <div class="modal-body">${content}</div>
     `;
     
@@ -406,22 +403,88 @@ function clearCache(key = null) {
 }
 
 // ============================================================================
-// АВТОРИЗАЦИЯ
+// МОДАЛЬНОЕ ОКНО ПОДТВЕРЖДЕНИЯ (для выхода и других действий)
+// ============================================================================
+
+window.showConfirmModal = (options) => {
+    const { title, message, onConfirm, onCancel, confirmText = 'Да', cancelText = 'Нет' } = options;
+    
+    const modalContent = `
+        <div style="text-align: center;">
+            <h3 style="margin-bottom: 1rem; color: var(--color-primary);">${title}</h3>
+            <p style="margin-bottom: 1.5rem; color: var(--color-text-secondary);">${message}</p>
+            <div style="display: flex; gap: 1rem; justify-content: center;">
+                <button class="submit-btn" id="confirm-yes" style="width: auto; padding: 0.5rem 1.5rem;">${confirmText}</button>
+                <button class="admin-btn" id="confirm-no" style="width: auto; padding: 0.5rem 1.5rem;">${cancelText}</button>
+            </div>
+        </div>
+    `;
+    
+    const modal = createModal({
+        title: '',
+        content: modalContent,
+        width: '400px'
+    });
+    
+    document.getElementById('confirm-yes').addEventListener('click', () => {
+        modal.close();
+        if (onConfirm) onConfirm();
+    });
+    
+    document.getElementById('confirm-no').addEventListener('click', () => {
+        modal.close();
+        if (onCancel) onCancel();
+    });
+};
+
+// ============================================================================
+// ФУНКЦИЯ ВЫХОДА (без alert)
+// ============================================================================
+
+window.logout = async function() {
+    showConfirmModal({
+        title: 'Выход из системы',
+        message: 'Вы уверены, что хотите выйти?',
+        confirmText: 'Выйти',
+        cancelText: 'Отмена',
+        onConfirm: async () => {
+            try {
+                await fetch('/api/logout', { 
+                    method: 'POST', 
+                    credentials: 'include',
+                });
+                NotificationManager.show('Вы вышли из системы', 'info');
+                window.location.href = '/views/index.html';
+            } catch (error) {
+                console.error('Ошибка при выходе:', error);
+                window.location.href = '/views/index.html';
+            }
+        }
+    });
+};
+
+// ============================================================================
+// АВТОРИЗАЦИЯ И НАВИГАЦИЯ
 // ============================================================================
 
 async function updateAuthUI() {
-    const loginBtn = document.querySelector('.btn-login');
+    const loginBtn = document.getElementById('loginBtn');
+    const userBadge = document.getElementById('userBadge');
+    const logoutBtn = document.getElementById('logoutBtn');
+    
     if (!loginBtn) return;
     
     try {
-        const response = await fetch('/api/me', {
-            credentials: 'include'
-        });
+        const response = await fetch('/api/me', { credentials: 'include' });
         
         if (response.status === 401) {
-            loginBtn.textContent = 'Вход';
-            loginBtn.href = '/views/login.html';
-            loginBtn.classList.remove('logged-in');
+            if (loginBtn) {
+                loginBtn.textContent = 'Вход';
+                loginBtn.href = '/views/login.html';
+                loginBtn.classList.remove('logged-in');
+            }
+            if (userBadge) userBadge.style.display = 'none';
+            if (logoutBtn) logoutBtn.style.display = 'none';
             AppCache.user = null;
             return;
         }
@@ -430,63 +493,72 @@ async function updateAuthUI() {
         AppCache.user = data.user;
         
         if (data.user) {
-            loginBtn.textContent = '👤 Аккаунт';
-            loginBtn.href = '/views/admin-panel.html';
-            loginBtn.classList.add('logged-in');
-        } else {
-            loginBtn.textContent = 'Вход';
-            loginBtn.href = '/views/login.html';
-            loginBtn.classList.remove('logged-in');
+            if (loginBtn) {
+                loginBtn.textContent = 'Панель';
+                loginBtn.href = '/views/admin-panel.html';
+                loginBtn.classList.add('logged-in');
+            }
+            if (userBadge) {
+                userBadge.textContent = `${data.user.username}`;
+                userBadge.style.display = 'flex';
+            }
+            if (logoutBtn) logoutBtn.style.display = 'block';
         }
     } catch (error) {
         console.error('Ошибка авторизации:', error);
-        loginBtn.textContent = 'Вход';
-        loginBtn.href = '/views/login.html';
-        loginBtn.classList.remove('logged-in');
     }
 }
 
 // ============================================================================
-// НАВИГАЦИЯ
+// ИНИЦИАЛИЗАЦИЯ НАВИГАЦИИ
 // ============================================================================
 
-function updateNavigation() {
+function initNavigation() {
     const header = document.querySelector('.site-header');
     if (!header) return;
     
-    if (!document.querySelector('.home-link')) {
-        const homeLink = document.createElement('a');
-        homeLink.href = '/views/index.html';
-        homeLink.className = 'home-link';
-        homeLink.innerHTML = '🏠 <span>Главная</span>';
-        header.insertBefore(homeLink, header.firstChild);
+    // Динамически создаем навигацию, если она не задана в HTML
+    if (!document.querySelector('.nav-container')) {
+        header.innerHTML = `
+            <div class="nav-container">
+                <div class="logo">
+                    <a href="/views/index.html">⌨️ MUSEUM TECH</a>
+                </div>
+                <div class="nav-links">
+                    <a href="/views/index.html">Главная</a>
+                    <a href="/views/about.html">О музее</a>
+                </div>
+                <div class="header-actions">
+                    <a href="/views/login.html" class="btn-outline" id="loginBtn">Вход</a>
+                    <span class="user-badge" id="userBadge" style="display: none;"></span>
+                    <button id="logoutBtn" class="btn-outline" style="display: none;">Выход</button>
+                </div>
+            </div>
+        `;
+        
+        // Переназначаем обработчики
+        const newLogoutBtn = document.getElementById('logoutBtn');
+        if (newLogoutBtn) newLogoutBtn.addEventListener('click', logout);
     }
+    
+    updateAuthUI();
 }
 
 // ============================================================================
-// ИНИЦИАЛИЗАЦИЯ
+// ИНИЦИАЛИЗАЦИЯ ПРИ ЗАГРУЗКЕ СТРАНИЦЫ
 // ============================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
-    updateNavigation();
-    updateAuthUI();
+    initNavigation();
     window.addEventListener('authChange', updateAuthUI);
     
+    // Для страницы админ-панели проверяем авторизацию
     const currentPage = window.location.pathname;
     if (currentPage.includes('admin-panel.html')) {
         fetchAPI('/api/me').catch(() => {
             window.location.href = '/views/login.html';
         });
     }
-});
-
-// Эффект свечения при скролле
-window.addEventListener('scroll', () => {
-    const scrollY = window.scrollY;
-    const maxScroll = document.body.scrollHeight - window.innerHeight;
-    const progress = scrollY / maxScroll;
-    const hue = 180 + (progress * 180); // от 180 (cyan) до 360 (pink)
-    document.documentElement.style.setProperty('--neon-cyan', `hsl(${hue}, 100%, 55%)`);
 });
 
 // ============================================================================
