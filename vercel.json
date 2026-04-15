@@ -4,17 +4,9 @@
     {
       "src": "server.js",
       "use": "@vercel/node"
-    },
-    {
-      "src": "api/bot.js",
-      "use": "@vercel/node"
     }
   ],
   "routes": [
-    {
-      "src": "/api/bot",
-      "dest": "/api/bot.js"
-    },
     {
       "src": "/(.*)",
       "dest": "/server.js"
